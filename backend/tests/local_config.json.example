@@ -1,0 +1,19 @@
+# KataGo integration test setup
+#
+# tests/test_engine_manager_integration.py (marker: `integration`) runs
+# against a real, locally-installed KataGo binary and neural network model.
+# It is skipped automatically unless both of these environment variables
+# are set in your shell before running pytest:
+#
+#   BADUK_KATAGO_BINARY  - absolute path to the katago executable
+#                          e.g. C:/Users/you/.katrain/katago-v1.16.0-opencl-windows-x64.exe
+#   BADUK_KATAGO_MODEL   - absolute path to the .bin.gz neural net model
+#                          e.g. C:/Users/you/.katrain/kata1-b28c512nbt-s12464049920-d5727206990.bin.gz
+#
+# Example (PowerShell):
+#   $env:BADUK_KATAGO_BINARY = "C:/path/to/katago.exe"
+#   $env:BADUK_KATAGO_MODEL = "C:/path/to/model.bin.gz"
+#   uv run pytest tests/test_engine_manager_integration.py -v -m integration
+#
+# These paths point at machine-local files (often multi-hundred-MB model
+# weights) and are never committed to the repository.

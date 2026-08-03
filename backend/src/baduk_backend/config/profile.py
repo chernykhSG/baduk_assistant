@@ -13,7 +13,6 @@ class KataGoProfile:
 
 
 ANALYSIS_CONFIG_TEMPLATE = """\
-logDir =
 logAllRequests = false
 logAllResponses = false
 logSearchInfo = false
@@ -31,8 +30,16 @@ maxVisits = {max_visits}
 """
 
 
-def render_analysis_config(profile: KataGoProfile) -> str:
-    return ANALYSIS_CONFIG_TEMPLATE.format(
+def render_analysis_config(profile: KataGoProfile, home_data_dir_override: str | None = None) -> str:
+    config_text = ANALYSIS_CONFIG_TEMPLATE.format(
         num_analysis_threads=profile.num_analysis_threads,
         max_visits=profile.max_visits,
     )
+    if home_data_dir_override is not None:
+        # KataGo's real config key is `homeDataDir` (confirmed via the binary's
+        # own embedded default-config comments), not `homeDataDirOverride`.
+        # Setting it makes KataGo look for/write its OpenCL tuning cache
+        # directly under this directory (as `<homeDataDir>/opencltuning/...`),
+        # instead of the unconfigured default of `<cwd or exe dir>/KataGoData/opencltuning/...`.
+        config_text += f"\nhomeDataDir = {home_data_dir_override}\n"
+    return config_text
