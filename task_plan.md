@@ -34,7 +34,9 @@
 - [x] Реализация backend-плана (5 задач + финальное ревью), ветка `phase-1-viewer-katago`.
 - [x] Backend-часть (sidecar+EngineManager) смёржена в `main`, ветка `phase-1-viewer-katago` удалена.
 - [x] Начата frontend-часть (ветка `phase-1-frontend`) — приостановлена, обнаружен пробел (см. выше).
-- [ ] Brainstorming + implementation-план недостающего API-слоя (HTTP `/analyze` + WS-стриминг над `EngineManager`), ветка `phase-1-backend-api` — в процессе.
+- [x] Brainstorming API-слоя — дизайн-спек `docs/superpowers/specs/2026-08-03-phase-1-backend-api-design.md` (ветка `phase-1-backend-api`).
+- [x] Детальный implementation-план API-слоя — `docs/superpowers/plans/2026-08-03-phase-1-backend-api.md` (5 задач: Pydantic-схемы, drain-фикс EngineManager, `POST /api/analyze`+wiring, `WS /api/analyze/stream`, real-KataGo integration-тест через HTTP).
+- [ ] Выполнить план API-слоя через `subagent-driven-development`.
 - [ ] После мержа API-слоя — вернуться в `phase-1-frontend` (или rebase) и продолжить: board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка.
 
 ## Будущие задачи (backlog)
