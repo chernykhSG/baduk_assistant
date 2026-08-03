@@ -10,13 +10,13 @@
 
 ## Где мы сейчас
 
-Фаза 1 — **начата**. Ветка `phase-1-viewer-katago` создана поверх `main` (коммит `489d5f1` — архитектура + планирование). Открытых архитектурных решений на уровне всего проекта нет; уточнение конкретики самой Фазы 1 (структура каталогов, пакетные менеджеры, тестовые фреймворки) — см. «Текущие задачи» ниже.
+Фаза 1 — **backend-часть готова** (ветка `phase-1-viewer-katago`, ещё не смёржена в `main`). Реализованы: sidecar-скелет + health-check (FastAPI, токен-аутентификация), `KataGoProfile` + шаблон `.cfg`, `EngineManager` (жизненный цикл процесса KataGo Analysis Engine, авто-restart, дренаж stdout/stderr), реальный integration-тест против локального KataGo пользователя (winrate/ownership/PV подтверждены). Financial-review пройден (7 Important-находок исправлены одним fix-wave, ре-ревью чистое). Frontend (Shudan/SGF/overlay-панели) — отдельный будущий план, ещё не начат.
 
 ## Roadmap (из `docs/ARCHITECTURE.md` → «Поэтапный MVP-roadmap»)
 
 | # | Фаза | Статус |
 |---|------|--------|
-| 1 | SGF viewer + KataGo-анализ (без LLM) | **в работе** (ветка `phase-1-viewer-katago`) |
+| 1 | SGF viewer + KataGo-анализ (без LLM) | **backend готов**, frontend не начат (ветка `phase-1-viewer-katago`) |
 | 2 | LLM-объяснения поверх KataGo (без RAG) | не начата |
 | 3 | RAG-база знаний | не начата |
 | 4 | Паспорт игрока | не начата |
@@ -27,14 +27,18 @@
 
 ## Текущие задачи (current tasks)
 
-- [x] Уточнить (brainstorming) нерешённую конкретику Фазы 1 перед кодом — готово, см. дизайн-спек `docs/superpowers/specs/2026-08-03-phase-1-viewer-katago-design.md`: Shudan, pnpm, uv, Vitest/pytest, electron-vite, локальные пути KataGo.
-- [ ] Детальный implementation-план Фазы 1 (`superpowers:writing-plans`, затем `test-driven-development`) на основе утверждённого дизайн-спека.
-- [ ] Реализация по плану, коммиты в `phase-1-viewer-katago`.
+- [x] Уточнить (brainstorming) нерешённую конкретику Фазы 1 перед кодом — см. дизайн-спек `docs/superpowers/specs/2026-08-03-phase-1-viewer-katago-design.md`: Shudan, pnpm, uv, Vitest/pytest, electron-vite, локальные пути KataGo.
+- [x] Детальный implementation-план backend-части Фазы 1 — `docs/superpowers/plans/2026-08-03-phase-1-backend-engine-manager.md`.
+- [x] Реализация backend-плана (5 задач + финальное ревью), ветка `phase-1-viewer-katago`.
+- [ ] Решить, что дальше с веткой `phase-1-viewer-katago`: смёржить в `main` или продолжать в ней же frontend-часть (`superpowers:finishing-a-development-branch` даст варианты).
+- [ ] Написать implementation-план frontend-части Фазы 1 (board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка) — отдельный план(ы), пока не начат(ы).
 
 ## Будущие задачи (backlog)
 
-- Проверить точечно совместимость нужных React-only библиотек (напр. shadcn/Radix) через `preact/compat`, если/когда они понадобятся в Фазе 1 (см. `findings.md`).
-- Фаза 2 и далее — не начинать, пока Фаза 1 не завершена и не проверена по критериям из `docs/ARCHITECTURE.md`.
+- Проверить точечно совместимость нужных React-only библиотек (напр. shadcn/Radix) через `preact/compat`, если/когда они понадобятся во frontend-части Фазы 1 (см. `findings.md`).
+- API-слой поверх EngineManager (следующая фаза работы над backend) должен явно закрыть два отложенных при финальном ревью пункта: пересинхронизация запрос/ответ после `TimeoutError` и блокировка от конкурентных `analyze()` — оба станут реальными багами, как только появятся конкурентные HTTP-запросы.
+- Уточнить, почему `uv` пропал из PATH в части сессий (Task 1 использовал его успешно, поздние задачи — уже нет); README backend уже документирует рабочий fallback через `.venv` напрямую.
+- Фаза 2 и далее — не начинать, пока Фаза 1 не завершена целиком (backend+frontend) и не проверена по критериям из `docs/ARCHITECTURE.md`.
 
 ## Decisions log
 
