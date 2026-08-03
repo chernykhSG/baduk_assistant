@@ -18,6 +18,8 @@ class EngineManager:
         self._process: subprocess.Popen | None = None
         self._stdout_queue: queue.Queue = queue.Queue()
         self._reader_thread: threading.Thread | None = None
+        self._stderr_lines: list[str] = []
+        self._stderr_thread: threading.Thread | None = None
 
     def start(self) -> None:
         self._process = subprocess.Popen(
@@ -28,8 +30,11 @@ class EngineManager:
             text=True,
             bufsize=1,
         )
+        self._stderr_lines = []
         self._reader_thread = threading.Thread(target=self._read_stdout, daemon=True)
         self._reader_thread.start()
+        self._stderr_thread = threading.Thread(target=self._read_stderr, daemon=True)
+        self._stderr_thread.start()
 
     def _read_stdout(self) -> None:
         assert self._process is not None
@@ -38,6 +43,21 @@ class EngineManager:
             line = line.strip()
             if line:
                 self._stdout_queue.put(line)
+
+    def _read_stderr(self) -> None:
+        # Must be drained continuously, not just on demand: an unread stderr
+        # pipe fills its OS buffer once the child logs enough (KataGo logs
+        # heavily at startup), which blocks the child's own stderr write and
+        # wedges analyze() for the full timeout instead of failing fast.
+        assert self._process is not None
+        assert self._process.stderr is not None
+        for line in self._process.stderr:
+            line = line.strip()
+            if line:
+                self._stderr_lines.append(line)
+
+    def stderr_output(self) -> str:
+        return "\n".join(self._stderr_lines)
 
     def is_running(self) -> bool:
         return self._process is not None and self._process.poll() is None

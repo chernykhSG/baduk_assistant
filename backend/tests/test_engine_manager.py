@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 
 from baduk_backend.engine_manager import EngineManager
@@ -8,6 +9,10 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 def fake_katago_command() -> list[str]:
     return [sys.executable, str(FIXTURES_DIR / "fake_katago.py")]
+
+
+def noisy_stderr_katago_command() -> list[str]:
+    return [sys.executable, str(FIXTURES_DIR / "noisy_stderr_katago.py")]
 
 
 def test_analyze_sends_request_and_parses_response():
@@ -29,5 +34,30 @@ def test_analyze_auto_starts_process_if_not_running():
         response = manager.analyze({"id": "test-2", "moves": []})
         assert response["id"] == "test-2"
         assert manager.is_running()
+    finally:
+        manager.stop()
+
+
+def test_analyze_does_not_deadlock_on_heavy_stderr_output():
+    # Regression test: if stderr isn't drained continuously, a process that
+    # logs heavily at startup (like real KataGo) fills the OS pipe buffer,
+    # blocks on its own stderr write, and analyze() hangs until `timeout`
+    # elapses instead of returning promptly.
+    manager = EngineManager(noisy_stderr_katago_command())
+    try:
+        start = time.time()
+        response = manager.analyze({"id": "test-3"}, timeout=10.0)
+        elapsed = time.time() - start
+        assert response["id"] == "test-3"
+        assert elapsed < 5.0, f"analyze() took {elapsed:.2f}s, suggests stderr pipe deadlock"
+
+        # Give the stderr reader thread a moment to finish draining, then
+        # confirm the captured output is actually observable.
+        deadline = time.time() + 2.0
+        while "handling request test-3" not in manager.stderr_output() and time.time() < deadline:
+            time.sleep(0.05)
+        stderr_text = manager.stderr_output()
+        assert "startup log line 2999" in stderr_text
+        assert "handling request test-3" in stderr_text
     finally:
         manager.stop()
