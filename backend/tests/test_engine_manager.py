@@ -2,7 +2,9 @@ import sys
 import time
 from pathlib import Path
 
-from baduk_backend.engine_manager import EngineManager
+import pytest
+
+from baduk_backend.engine_manager import EngineManager, KataGoCrashError
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -59,5 +61,29 @@ def test_analyze_does_not_deadlock_on_heavy_stderr_output():
         stderr_text = manager.stderr_output()
         assert "startup log line 2999" in stderr_text
         assert "handling request test-3" in stderr_text
+    finally:
+        manager.stop()
+
+
+def fake_katago_crash_command() -> list[str]:
+    return [sys.executable, str(FIXTURES_DIR / "fake_katago_crash.py")]
+
+
+def test_analyze_raises_crash_error_when_process_exits_immediately():
+    manager = EngineManager(fake_katago_crash_command())
+    with pytest.raises(KataGoCrashError):
+        manager.analyze({"id": "test-3", "moves": []}, timeout=2.0)
+    assert not manager.is_running()
+
+
+def test_manager_recovers_after_crash_with_working_command():
+    manager = EngineManager(fake_katago_crash_command())
+    with pytest.raises(KataGoCrashError):
+        manager.analyze({"id": "test-4", "moves": []}, timeout=2.0)
+
+    manager.command = fake_katago_command()
+    try:
+        response = manager.analyze({"id": "test-5", "moves": []})
+        assert response["id"] == "test-5"
     finally:
         manager.stop()
