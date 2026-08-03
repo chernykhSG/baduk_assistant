@@ -10,8 +10,8 @@ AUTH_TOKEN = secrets.token_urlsafe(32)
 
 
 @app.get("/health")
-def health(x_auth_token: str = Header(...)) -> dict:
-    if x_auth_token != AUTH_TOKEN:
+def health(x_auth_token: str | None = Header(default=None)) -> dict:
+    if x_auth_token is None or not secrets.compare_digest(x_auth_token, AUTH_TOKEN):
         raise HTTPException(status_code=401, detail="invalid token")
     return {"status": "ok"}
 

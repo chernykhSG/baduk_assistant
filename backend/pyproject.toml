@@ -1,7 +1,7 @@
 [project]
 name = "baduk-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Baduk Assistant backend service: KataGo Engine Manager and HTTP/WS API"
 readme = "README.md"
 authors = [
     { name = "Sergey Chernykh", email = "chernykh.project@gmail.com" }

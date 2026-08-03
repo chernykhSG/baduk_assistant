@@ -21,13 +21,33 @@ class EngineManager:
         self._stderr_lines: list[str] = []
         self._stderr_thread: threading.Thread | None = None
 
+    def _close_pipes(self) -> None:
+        # terminate()/wait()/kill() don't close the parent-side pipe file
+        # objects (only communicate() or a `with` context manager does) -
+        # close them explicitly here to avoid leaking file handles across
+        # restart/crash-recovery cycles. Guard against streams that are
+        # already closed or absent (e.g. Popen creation failed).
+        if self._process is None:
+            return
+        for stream in (self._process.stdin, self._process.stdout, self._process.stderr):
+            if stream is not None and not stream.closed:
+                try:
+                    stream.close()
+                except OSError:
+                    pass
+
     def start(self) -> None:
+        # If a previous (e.g. crashed) process is still referenced, close its
+        # pipes before dropping the reference so we don't leak file handles.
+        self._close_pipes()
         self._process = subprocess.Popen(
             self.command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
         )
         self._stderr_lines = []
@@ -69,6 +89,7 @@ class EngineManager:
                 self._process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self._process.kill()
+            self._close_pipes()
             self._process = None
 
     def analyze(self, request: dict, timeout: float = 30.0) -> dict:

@@ -19,10 +19,10 @@ def test_health_with_invalid_token_returns_401():
     assert response.status_code == 401
 
 
-def test_health_without_token_returns_422():
+def test_health_without_token_returns_401():
     client = TestClient(app)
     response = client.get("/health")
-    assert response.status_code == 422
+    assert response.status_code == 401
 
 
 def test_build_startup_message_contains_port_and_token():
