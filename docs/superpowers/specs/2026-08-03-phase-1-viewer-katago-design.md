@@ -20,8 +20,8 @@
 | Frontend-тесты | **Vitest** | Естественно сочетается с Vite-сборкой Electron-фронта, быстрый, хорошая TS-поддержка. |
 | Backend-тесты | **pytest** | Стандарт для Python, без альтернатив не рассматривался. |
 | Electron build-инструмент | **electron-vite** | Готовый шаблон main/preload/renderer на Vite с HMR, совместим с electron-builder (уже выбран в `docs/ARCHITECTURE.md` § Упаковка) — минимум ручной конфигурации. |
-| KataGo-бинарник (dev/smoke-test) | `C:\Users\User\.katrain\katago-v1.16.0-opencl-windows-x64.exe` | Уже установлен локально (через KaTrain), GPU уже оттюнен (`opencltuning/` присутствует). |
-| KataGo-модель (dev/smoke-test) | `C:\Users\User\.katrain\kata1-b28c512nbt-s12464049920-d5727206990.bin.gz` | Указана пользователем. |
+| KataGo-бинарник (dev/smoke-test) | `C:/path/to/katago.exe` | Уже установлен локально (через KaTrain), GPU уже оттюнен (`opencltuning/` присутствует). |
+| KataGo-модель (dev/smoke-test) | `C:/path/to/model.bin.gz` | Указана пользователем. |
 
 Пути к KataGo-бинарнику/модели — специфичны для машины разработчика, не хардкодятся в исходном коде: читаются integration-тестами из `backend/tests/local_config.json` (git-ignored, не попадает в репозиторий; в репозитории — только `local_config.json.example` с пустыми полями-подсказками).
 
@@ -60,7 +60,7 @@ baduk_assistant/
 Вместо «сначала весь backend, потом весь frontend» — сначала тонкий работающий путь целиком, потом наращивание вглубь:
 
 1. **Скелет sidecar/IPC.** Electron main-процесс поднимает Python-backend как sidecar-процесс; backend отдаёт health-check HTTP-эндпоинт и WS-echo; frontend читает динамический порт и токен аутентификации, которые backend печатает в stdout при старте. Цель — проверить сам механизм sidecar+IPC до появления какой-либо Go-специфичной логики.
-2. **Engine Manager.** Оборачивает процесс KataGo Analysis Engine (используя локальный `katago-v1.16.0-opencl-windows-x64.exe` + `kata1-b28c512nbt-s12464049920-d5727206990.bin.gz`): генерирует `analysis_config.cfg` из шаблона + одного профиля, отправляет тестовую позицию по stdin, парсит JSON-ответ (moveInfos/rootInfo/ownership) из stdout. Это прямой аналог smoke-test-критерия Фазы 1 из `docs/ARCHITECTURE.md` § «Проверка», тестируется через pytest без HTTP-слоя.
+2. **Engine Manager.** Оборачивает процесс KataGo Analysis Engine (используя локальный `katago.exe` + `.bin.gz`-модель): генерирует `analysis_config.cfg` из шаблона + одного профиля, отправляет тестовую позицию по stdin, парсит JSON-ответ (moveInfos/rootInfo/ownership) из stdout. Это прямой аналог smoke-test-критерия Фазы 1 из `docs/ARCHITECTURE.md` § «Проверка», тестируется через pytest без HTTP-слоя.
 3. **API поверх Engine Manager.** HTTP REST-эндпоинт принимает позицию (moves/rules/komi/boardSize), делегирует в Engine Manager, возвращает разобранный ответ; WebSocket стримит прогресс анализа.
 4. **Board + SGF на фронте.** Shudan-обёртка рендерит доску; парсинг SGF (drag&drop загрузка); дерево вариаций; клавиатурная навигация (стрелки — шаг по дереву, согласно `docs/ARCHITECTURE.md` § UI/UX-принципы фронтенда). Тестируется на fixture-SGF независимо от backend.
 5. **Overlay-панели анализа.** Winrate line-chart (несколько серий различаются стилем линии, не только цветом), ownership heatmap (cool→hot градиент + numeric-фолбэк по hover/клику + легенда), PV-стрелки — подключаются к IPC-клиенту, бьющему в реальный backend/Engine Manager из шага 3.

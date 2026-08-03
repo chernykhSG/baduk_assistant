@@ -13,8 +13,8 @@
 - This plan is **backend-only**. No Electron/frontend code — that's a separate later plan (per `docs/superpowers/specs/2026-08-03-phase-1-viewer-katago-design.md`, step 4 of the vertical slice).
 - Python tooling is `uv` exclusively: `uv init`, `uv add`, `uv run`. Do not hand-write `pyproject.toml` dependency sections — use `uv add`.
 - `rules`, `komi`, `boardXSize`, `boardYSize` are per-request JSON fields in KataGo's Analysis Engine protocol, not `.cfg` file settings — do not add them to `render_analysis_config`.
-- Integration tests that need a real KataGo binary/model are marked `@pytest.mark.integration`, excluded by default (`addopts = -m "not integration"`), and additionally self-skip via a fixture if `backend/tests/local_config.json` is absent — never required for the default `uv run pytest` to pass.
-- `backend/tests/local_config.json` is git-ignored (machine-specific paths); only `local_config.json.example` is committed.
+- Integration tests that need a real KataGo binary/model are marked `@pytest.mark.integration`, excluded by default (`addopts = -m "not integration"`), and additionally self-skip via `backend/tests/conftest.py`'s `local_katago_config` fixture, which reads the `BADUK_KATAGO_BINARY` and `BADUK_KATAGO_MODEL` environment variables and calls `pytest.skip(...)` naming both variables if either is unset — never required for the default `uv run pytest` to pass.
+- No machine-specific config file is committed or created: paths come from the `BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` environment variables; `local_config.json.example` documents these two variables (it is not a JSON template to be copied).
 - All file paths below are relative to the repo root `c:\GithubProject\baduk_assistant`. Run all `uv`/`pytest` commands from inside `backend/` once it exists.
 
 ---
@@ -612,50 +612,36 @@ EOF
 - Consumes: `EngineManager`, `build_katago_command` from Task 3; `KataGoProfile`, `render_analysis_config` from Task 2.
 - Produces: `local_katago_config` pytest fixture (from `conftest.py`), reusable by future integration tests in later plans.
 
-- [ ] **Step 1: Add the git-ignored local config and its example**
+- [ ] **Step 1: Add the git-ignored safety-net entry and the example doc**
 
-Append to `backend/.gitignore`:
+Append to `backend/.gitignore` (defense-in-depth only — the shipped design never creates this file, but a future developer might for local convenience):
 
 ```
 tests/local_config.json
 ```
 
-Create `backend/tests/local_config.json.example`:
-
-```json
-{
-  "katago_binary": "C:/path/to/katago.exe",
-  "katago_model": "C:/path/to/model.bin.gz"
-}
-```
-
-Create `backend/tests/local_config.json` (this exact file is git-ignored, safe to create with your real local paths):
-
-```json
-{
-  "katago_binary": "C:/Users/User/.katrain/katago-v1.16.0-opencl-windows-x64.exe",
-  "katago_model": "C:/Users/User/.katrain/kata1-b28c512nbt-s12464049920-d5727206990.bin.gz"
-}
-```
+Create `backend/tests/local_config.json.example` — not a JSON template to copy, but a comment-only doc explaining that the real integration test config comes from two environment variables, `BADUK_KATAGO_BINARY` (absolute path to the katago executable) and `BADUK_KATAGO_MODEL` (absolute path to the `.bin.gz` neural net model), with example `PowerShell` invocations (`$env:BADUK_KATAGO_BINARY = "C:/path/to/katago.exe"`, etc.) and a note that these paths are machine-local and never committed.
 
 - [ ] **Step 2: Write the conftest fixture**
 
 Create `backend/tests/conftest.py`:
 
 ```python
-import json
-from pathlib import Path
+import os
 
 import pytest
-
-LOCAL_CONFIG_PATH = Path(__file__).parent / "local_config.json"
 
 
 @pytest.fixture
 def local_katago_config():
-    if not LOCAL_CONFIG_PATH.exists():
-        pytest.skip("backend/tests/local_config.json not found; see local_config.json.example")
-    return json.loads(LOCAL_CONFIG_PATH.read_text())
+    katago_binary = os.environ.get("BADUK_KATAGO_BINARY")
+    katago_model = os.environ.get("BADUK_KATAGO_MODEL")
+    if not katago_binary or not katago_model:
+        pytest.skip(
+            "BADUK_KATAGO_BINARY and BADUK_KATAGO_MODEL env vars not set; "
+            "see tests/local_config.json.example"
+        )
+    return {"katago_binary": katago_binary, "katago_model": katago_model}
 ```
 
 - [ ] **Step 3: Write the integration test**
@@ -720,7 +706,7 @@ def test_real_katago_returns_winrate_ownership_and_pv(local_katago_config, tmp_p
 
 - [ ] **Step 4: Run the integration test explicitly**
 
-Run: `uv run pytest tests/test_engine_manager_integration.py -v -m integration`
+With `BADUK_KATAGO_BINARY` and `BADUK_KATAGO_MODEL` set in your shell to your local katago executable and model paths, run: `uv run pytest tests/test_engine_manager_integration.py -v -m integration`
 Expected: 1 passed.
 
 If it instead raises `KataGoCrashError`: the process died on startup, almost always because `analysis_config.cfg` is missing a key your installed KataGo version requires. Print `manager.stderr_output()` (captured continuously by the background stderr-reader thread added in Task 3) to see KataGo's own error message directly — no need to re-run manually in a separate terminal unless that's more convenient. Adjust `ANALYSIS_CONFIG_TEMPLATE` in `backend/src/baduk_backend/config/profile.py` (Task 2) to match, and re-run this test — do not change `EngineManager` itself for this.
@@ -740,8 +726,9 @@ Add real KataGo integration test for EngineManager
 Verifies the Phase 1 smoke-test criterion from docs/ARCHITECTURE.md:
 Engine Manager launches the real Analysis Engine, sends a test
 position, and parses winrate/ownership/PV from the response.
-tests/local_config.json (git-ignored) holds this machine's KataGo
-binary/model paths; only the .example is committed.
+BADUK_KATAGO_BINARY and BADUK_KATAGO_MODEL env vars hold this
+machine's KataGo binary/model paths; only local_config.json.example,
+which documents these two variables, is committed.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 EOF
@@ -752,6 +739,6 @@ EOF
 
 ## Definition of Done
 
-- `uv run pytest -v` (from `backend/`) passes with 0 failures, running Tasks 1–4's tests (11 tests) and skipping the Task 5 integration test only if `local_config.json` is absent.
+- `uv run pytest -v` (from `backend/`) passes with 0 failures, running Tasks 1–4's tests (11 tests) and skipping the Task 5 integration test only if `BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` are unset.
 - `uv run pytest -v -m integration` (from `backend/`) passes, proving the real local KataGo binary/model produce a parseable `winrate`/`ownership`/`pv` response — this is the exact Phase 1 backend smoke-test criterion in `docs/ARCHITECTURE.md` § «Проверка → Фаза 1».
 - No frontend/Electron code exists yet — that starts in the next plan in the sequence (per the design spec's vertical-slice ordering).
