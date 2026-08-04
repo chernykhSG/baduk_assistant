@@ -1,4 +1,5 @@
 import { currentTree, currentNodeId } from '../state/appState'
+import type { NodeObject } from './sgfLoader'
 
 function stepDown() {
   const tree = currentTree.value
@@ -40,7 +41,7 @@ export function VariationTree() {
     </div>
   )
 
-  function renderNode(node: any) {
+  function renderNode(node: NodeObject) {
     const isCurrent = node.id === currentNodeId.value
     return (
       <div class="variation-tree__node" key={node.id}>
@@ -52,7 +53,7 @@ export function VariationTree() {
           {node.data.B ? `B ${node.data.B[0]}` : node.data.W ? `W ${node.data.W[0]}` : '·'}
         </button>
         {node.children.length > 0 && (
-          <div class="variation-tree__children">{node.children.map((child: any) => renderNode(child))}</div>
+          <div class="variation-tree__children">{node.children.map((child: NodeObject) => renderNode(child))}</div>
         )}
       </div>
     )
