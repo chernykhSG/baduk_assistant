@@ -2,6 +2,16 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { startBackend, type BackendConnection } from './backendConnection'
+
+let backendConnectionPromise: Promise<BackendConnection> | null = null
+
+function getBackendConnection(): Promise<BackendConnection> {
+  if (!backendConnectionPromise) {
+    backendConnectionPromise = startBackend()
+  }
+  return backendConnectionPromise
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -51,6 +61,8 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle('backend:get-connection', () => getBackendConnection())
 
   createWindow()
 
