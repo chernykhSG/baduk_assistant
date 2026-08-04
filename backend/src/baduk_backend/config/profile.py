@@ -27,6 +27,8 @@ nnMutexPoolSizePowerOfTwo = 16
 nnRandomize = true
 
 maxVisits = {max_visits}
+
+reportAnalysisWinratesAs = BLACK
 """
 
 
