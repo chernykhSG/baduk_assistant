@@ -1,12 +1,7 @@
 @import './base.css';
 
 body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background-image: url('./wavy-lines.svg');
-  background-size: cover;
+  margin: 0;
   user-select: none;
 }
 
@@ -27,11 +22,7 @@ code {
 }
 
 #app {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  margin-bottom: 80px;
+  height: 100vh;
 }
 
 .logo {
@@ -160,4 +151,25 @@ code {
   .actions {
     display: none;
   }
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100vh;
+}
+.app-shell__top {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 8px;
+  overflow: hidden;
+}
+.app-shell__chart {
+  border-top: 1px solid var(--border-color, #333);
+}
+.connection-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
 }
