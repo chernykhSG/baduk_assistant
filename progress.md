@@ -48,3 +48,27 @@
 1. Прочитать `task_plan.md` → «Текущие задачи».
 2. Решить судьбу ветки `phase-1-viewer-katago` через `superpowers:finishing-a-development-branch`, если это ещё не сделано.
 3. Если продолжаем Фазу 1 — писать план(ы) для frontend-части (board+SGF, затем IPC+overlay-панели+сквозная приёмка), см. дизайн-спек.
+
+## 2026-08-04 — API-слой над EngineManager (HTTP+WS)
+
+**Сделано:**
+- Brainstorming недостающего API-слоя (обнаружен при планировании frontend-части: backend отдавал только `/health`, шаг 3 vertical slice — HTTP/WS роуты над `EngineManager` — не был реализован) → дизайн-спек `docs/superpowers/specs/2026-08-03-phase-1-backend-api-design.md`, ветка `phase-1-backend-api`.
+- Детальный implementation-план `docs/superpowers/plans/2026-08-03-phase-1-backend-api.md` (5 задач, полностью самодостаточных — весь код прописан заранее).
+- Выполнено через `subagent-driven-development`: Task 1 (Pydantic-схемы), Task 2 (drain-фикс стейл-очереди в `EngineManager.analyze()`), Task 3 (`auth.py` + `POST /api/analyze` + wiring `app.state.engine_manager`/`engine_lock` в `main.run()`), Task 4 (`WS /api/analyze/stream` с прогрессом по ходам), Task 5 (реальный integration-тест через HTTP-слой, подтверждён на локальном KataGo). Каждая задача — отдельный ревью, все прошли чисто (только Minor-находки, запаркованы в лог).
+- Финальное whole-branch ревью (opus) нашло 5 Important-находок, эмпирически подтверждённых (не только по чтению диффа): (1) ответ-ошибка KataGo (`{"error": ...}`) валился в 500/обрыв WS вместо типизированной ошибки; (2) `TimeoutError`/`ValueError` из `EngineManager.analyze()` не ловились ни в одном эндпоинте; (3) не-ASCII токен ронял `secrets.compare_digest` в `TypeError`→500 на неаутентифицированном пути; (4) `EngineManager` никогда не останавливался в `main.run()` — процесс `katago.exe` оставался сиротой на Windows при выходе родителя, плюс утечка temp `.cfg`; (5) не было теста, подтверждающего, что `asyncio.Lock` реально сериализует конкурентные запросы (ревьюер экспериментально показал: без лока 2 из 3 параллельных запросов падают).
+- Всё исправлено одним fix-wave (3 коммита) + один scoped re-review — все 5 ADDRESSED, один Minor запаркован (не воспроизводит исходную проблему).
+- По ходу ревью подтверждено: запрет на хардкод путей KataGo (переменные окружения) не нарушен нигде в ветке.
+
+**Не сделано / решено не делать (осознанно отложено):**
+- Дублирование полей `AnalyzeRequest`/`StreamAnalyzeRequest` (нет общего базового класса) — оставлено, т.к. асимметрия ограничений (`analyzeTurns` ровно 1 vs `turnNumbers` ≥1) содержательна.
+- WS не ловит `WebSocketDisconnect` при отключении клиента посреди стрима — не критично (движок не жжёт время впустую), просто необработанное исключение в логах.
+- `turnNumbers` не ограничен сверху по длине; схемы без границ значений (`maxVisits`/`komi`/`boardXSize`/`boardYSize`) — YAGNI для однопользовательского десктоп-сценария сейчас.
+- `main.py`'s `try/finally` не покрывает `_find_free_port()`/`print()` перед входом в `try` — крайне маловероятный failure-window, не воспроизводит утечку процесса.
+- Ветка `phase-1-backend-api` **не смёржена** — следующий шаг сессии.
+
+**Открытые вопросы:** нет по существу; организационный вопрос — как интегрировать ветку (см. `task_plan.md` → «Текущие задачи»).
+
+**Следующая сессия начинает с:**
+1. Прочитать `task_plan.md` → «Текущие задачи».
+2. Решить судьбу ветки `phase-1-backend-api` через `superpowers:finishing-a-development-branch`, если это ещё не сделано.
+3. После интеграции — вернуться в `phase-1-frontend` и продолжить: board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка.

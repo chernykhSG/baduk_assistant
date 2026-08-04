@@ -12,13 +12,13 @@
 
 Фаза 1 — **sidecar-скелет + EngineManager смёржены в `main`** (были в ветке `phase-1-viewer-katago`, удалена после мержа). Реализованы: health-check (FastAPI, токен-аутентификация), `KataGoProfile` + шаблон `.cfg`, `EngineManager` (жизненный цикл процесса KataGo Analysis Engine, авто-restart, дренаж stdout/stderr), реальный integration-тест против локального KataGo пользователя (winrate/ownership/PV подтверждены). Финальное ревью пройдено (7 Important-находок исправлены одним fix-wave).
 
-**Найден пробел при планировании frontend-части**: HTTP REST + WebSocket роуты над `EngineManager` для реального анализа позиций (шаг 3 vertical slice из дизайн-спека) не были реализованы backend-планом — только `/health`. Frontend не может быть дописан без этого слоя. Сейчас — ветка `phase-1-backend-api` для этого недостающего слоя (приоритет перед продолжением `phase-1-frontend`, которая содержит только Electron/board-scaffolding работу и пока не трогает реальный анализ).
+**API-слой (`phase-1-backend-api`) реализован и прошёл финальное ревью** — `POST /api/analyze` + `WS /api/analyze/stream` поверх единственного `EngineManager`/`asyncio.Lock` в `app.state`. 5 задач + один fix-wave на 5 Important-находок финального ревью (KataGo error-response → типизированная ошибка вместо 500/обрыва WS; `TimeoutError`/`ValueError` теперь ловятся; non-ASCII токен больше не роняет auth; `EngineManager.stop()` теперь вызывается при выключении sidecar + temp `.cfg` подчищается; добавлен regression-тест на `asyncio.Lock`). Ветка ещё не смёржена — следующий шаг сессии: `finishing-a-development-branch`.
 
 ## Roadmap (из `docs/ARCHITECTURE.md` → «Поэтапный MVP-roadmap»)
 
 | # | Фаза | Статус |
 |---|------|--------|
-| 1 | SGF viewer + KataGo-анализ (без LLM) | sidecar+EngineManager в `main`; **API-слой в работе** (`phase-1-backend-api`); frontend начат, приостановлен (`phase-1-frontend`) |
+| 1 | SGF viewer + KataGo-анализ (без LLM) | sidecar+EngineManager в `main`; **API-слой реализован, не смёржен** (`phase-1-backend-api`); frontend начат, приостановлен (`phase-1-frontend`) |
 | 2 | LLM-объяснения поверх KataGo (без RAG) | не начата |
 | 3 | RAG-база знаний | не начата |
 | 4 | Паспорт игрока | не начата |
@@ -36,13 +36,14 @@
 - [x] Начата frontend-часть (ветка `phase-1-frontend`) — приостановлена, обнаружен пробел (см. выше).
 - [x] Brainstorming API-слоя — дизайн-спек `docs/superpowers/specs/2026-08-03-phase-1-backend-api-design.md` (ветка `phase-1-backend-api`).
 - [x] Детальный implementation-план API-слоя — `docs/superpowers/plans/2026-08-03-phase-1-backend-api.md` (5 задач: Pydantic-схемы, drain-фикс EngineManager, `POST /api/analyze`+wiring, `WS /api/analyze/stream`, real-KataGo integration-тест через HTTP).
-- [ ] Выполнить план API-слоя через `subagent-driven-development`.
-- [ ] После мержа API-слоя — вернуться в `phase-1-frontend` (или rebase) и продолжить: board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка.
+- [x] Выполнить план API-слоя через `subagent-driven-development` (5 задач + финальное ревью + один fix-wave, всё чисто).
+- [ ] Решить судьбу ветки `phase-1-backend-api` через `superpowers:finishing-a-development-branch`.
+- [ ] После интеграции API-слоя — вернуться в `phase-1-frontend` (или rebase) и продолжить: board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка.
 
 ## Будущие задачи (backlog)
 
 - Проверить точечно совместимость нужных React-only библиотек (напр. shadcn/Radix) через `preact/compat`, если/когда они понадобятся во frontend-части Фазы 1 (см. `findings.md`).
-- API-слой (`phase-1-backend-api`, в работе) должен явно закрыть два отложенных при финальном ревью EngineManager пункта: пересинхронизация запрос/ответ после `TimeoutError` и блокировка от конкурентных `analyze()` — оба станут реальными багами, как только появятся конкурентные HTTP-запросы.
+- Минорные находки API-слоя, осознанно отложены (см. историю ветки `phase-1-backend-api` в git-логе): дублирование полей `AnalyzeRequest`/`StreamAnalyzeRequest` (нет общего базового класса), WS-хендлер после закрытия клиентом не ловит `WebSocketDisconnect` (не воспроизводит проблему, просто необработанное исключение в логах), `turnNumbers` не ограничен сверху по длине, схемы без границ значений (`maxVisits`/`komi`/`boardXSize`/`boardYSize`), `main.py`'s `try/finally` не покрывает `_find_free_port()`/`print()` перед ним (не воспроизводит утечку процесса).
 - Уточнить, почему `uv` пропал из PATH в части сессий (Task 1 использовал его успешно, поздние задачи — уже нет); README backend уже документирует рабочий fallback через `.venv` напрямую.
 - Фаза 2 и далее — не начинать, пока Фаза 1 не завершена целиком (backend+frontend) и не проверена по критериям из `docs/ARCHITECTURE.md`.
 
