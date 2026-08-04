@@ -10,15 +10,17 @@
 
 ## Где мы сейчас
 
-Фаза 1 — **sidecar-скелет + EngineManager смёржены в `main`** (были в ветке `phase-1-viewer-katago`, удалена после мержа). Реализованы: health-check (FastAPI, токен-аутентификация), `KataGoProfile` + шаблон `.cfg`, `EngineManager` (жизненный цикл процесса KataGo Analysis Engine, авто-restart, дренаж stdout/stderr), реальный integration-тест против локального KataGo пользователя (winrate/ownership/PV подтверждены). Финальное ревью пройдено (7 Important-находок исправлены одним fix-wave).
+Фаза 1 — **весь backend смёржен в `main`**, vertical-slice шаги 1–3 из дизайн-спека закрыты полностью:
+- Sidecar-скелет + `EngineManager` (были в ветке `phase-1-viewer-katago`, удалена после мержа): health-check (FastAPI, токен-аутентификация), `KataGoProfile` + шаблон `.cfg`, `EngineManager` (жизненный цикл процесса KataGo Analysis Engine, авто-restart, дренаж stdout/stderr), реальный integration-тест против локального KataGo пользователя (winrate/ownership/PV подтверждены). Финальное ревью пройдено (7 Important-находок исправлены одним fix-wave).
+- API-слой (был в ветке `phase-1-backend-api`, удалена после fast-forward мержа): `POST /api/analyze` + `WS /api/analyze/stream` поверх единственного `EngineManager`/`asyncio.Lock` в `app.state`. 5 задач + один fix-wave на 5 Important-находок финального ревью (KataGo error-response → типизированная ошибка вместо 500/обрыва WS; `TimeoutError`/`ValueError` теперь ловятся; non-ASCII токен больше не роняет auth; `EngineManager.stop()` теперь вызывается при выключении sidecar + temp `.cfg` подчищается; добавлен regression-тест на `asyncio.Lock`).
 
-**API-слой (`phase-1-backend-api`) реализован и прошёл финальное ревью** — `POST /api/analyze` + `WS /api/analyze/stream` поверх единственного `EngineManager`/`asyncio.Lock` в `app.state`. 5 задач + один fix-wave на 5 Important-находок финального ревью (KataGo error-response → типизированная ошибка вместо 500/обрыва WS; `TimeoutError`/`ValueError` теперь ловятся; non-ASCII токен больше не роняет auth; `EngineManager.stop()` теперь вызывается при выключении sidecar + temp `.cfg` подчищается; добавлен regression-тест на `asyncio.Lock`). Ветка ещё не смёржена — следующий шаг сессии: `finishing-a-development-branch`.
+Следующий шаг — вернуться к frontend-части (`phase-1-frontend`, приостановлена, только Electron/board-scaffolding задел).
 
 ## Roadmap (из `docs/ARCHITECTURE.md` → «Поэтапный MVP-roadmap»)
 
 | # | Фаза | Статус |
 |---|------|--------|
-| 1 | SGF viewer + KataGo-анализ (без LLM) | sidecar+EngineManager в `main`; **API-слой реализован, не смёржен** (`phase-1-backend-api`); frontend начат, приостановлен (`phase-1-frontend`) |
+| 1 | SGF viewer + KataGo-анализ (без LLM) | **backend полностью в `main`** (sidecar+EngineManager+API-слой); frontend начат, приостановлен (`phase-1-frontend`) |
 | 2 | LLM-объяснения поверх KataGo (без RAG) | не начата |
 | 3 | RAG-база знаний | не начата |
 | 4 | Паспорт игрока | не начата |
@@ -37,8 +39,8 @@
 - [x] Brainstorming API-слоя — дизайн-спек `docs/superpowers/specs/2026-08-03-phase-1-backend-api-design.md` (ветка `phase-1-backend-api`).
 - [x] Детальный implementation-план API-слоя — `docs/superpowers/plans/2026-08-03-phase-1-backend-api.md` (5 задач: Pydantic-схемы, drain-фикс EngineManager, `POST /api/analyze`+wiring, `WS /api/analyze/stream`, real-KataGo integration-тест через HTTP).
 - [x] Выполнить план API-слоя через `subagent-driven-development` (5 задач + финальное ревью + один fix-wave, всё чисто).
-- [ ] Решить судьбу ветки `phase-1-backend-api` через `superpowers:finishing-a-development-branch`.
-- [ ] После интеграции API-слоя — вернуться в `phase-1-frontend` (или rebase) и продолжить: board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка.
+- [x] Ветка `phase-1-backend-api` смёржена в `main` локально (fast-forward) через `superpowers:finishing-a-development-branch`, удалена.
+- [ ] Вернуться в `phase-1-frontend` (или rebase на текущий `main`) и продолжить: board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка.
 
 ## Будущие задачи (backlog)
 
