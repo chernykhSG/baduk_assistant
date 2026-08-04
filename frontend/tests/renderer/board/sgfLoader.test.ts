@@ -7,6 +7,7 @@ import {
   SgfParseError,
   getBoardSize,
   findMainLineLeaf,
+  mainLineNodeIds,
   movesFromRootToNode
 } from '@renderer/board/sgfLoader'
 
@@ -44,8 +45,9 @@ describe('getBoardSize', () => {
     expect(getBoardSize(tree)).toBe(19)
   })
 
-  it('throws on rectangular boards', () => {
+  it('throws SgfParseError on rectangular boards', () => {
     const tree = parseSgf('(;GM[1]FF[4]SZ[19:13];B[qd])')
+    expect(() => getBoardSize(tree)).toThrow(SgfParseError)
     expect(() => getBoardSize(tree)).toThrow(/Rectangular boards/)
   })
 })
@@ -65,5 +67,29 @@ describe('findMainLineLeaf + movesFromRootToNode', () => {
   it('returns an empty list for the root node itself', () => {
     const tree = parseSgf(fixtureContent)
     expect(movesFromRootToNode(tree, tree.root.id)).toEqual([])
+  })
+})
+
+describe('mainLineNodeIds', () => {
+  it('lists node ids from root to leaf, index i being the node at turn i', () => {
+    const tree = parseSgf(fixtureContent)
+    const leaf = findMainLineLeaf(tree)
+    const ids = mainLineNodeIds(tree)
+
+    expect(ids[0]).toBe(tree.root.id)
+    expect(ids[ids.length - 1]).toBe(leaf.id)
+    expect(ids.length).toBe(movesFromRootToNode(tree, leaf.id).length + 1)
+  })
+
+  it('only follows the first-child branch, excluding variation nodes', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee](;W[ec])(;W[gc]))')
+    const ids = mainLineNodeIds(tree)
+    type Node = { id: number; children: Node[] }
+    const bMoveNode = (tree.root as Node).children[0]
+    const mainLineVariation = bMoveNode.children[0]
+    const otherVariation = bMoveNode.children[1]
+
+    expect(ids).toEqual([tree.root.id, bMoveNode.id, mainLineVariation.id])
+    expect(ids).not.toContain(otherVariation.id)
   })
 })

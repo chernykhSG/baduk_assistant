@@ -25,7 +25,7 @@ export const currentTurnNumber = computed(() => {
 })
 
 export const currentMoveAnalysis = computed(() => {
-  const turn = currentTurnNumber.value
-  if (turn === null) return null
-  return analysisByTurn.value.get(turn) ?? null
+  const nodeId = currentNodeId.value
+  if (nodeId === null) return null
+  return analysisByTurn.value.get(nodeId) ?? null
 })

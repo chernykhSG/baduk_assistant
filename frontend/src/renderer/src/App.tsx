@@ -3,7 +3,7 @@ import { signal } from '@preact/signals'
 import { BoardView } from './board/BoardView'
 import { VariationTree } from './board/VariationTree'
 import { WinrateChart } from './analysis/WinrateChart'
-import { parseSgf, SgfParseError } from './board/sgfLoader'
+import { parseSgf, getBoardSize, mainLineNodeIds, SgfParseError } from './board/sgfLoader'
 import { buildStreamRequest } from './board/gameRequestBuilder'
 import { streamAnalysis } from './ipc/client'
 import { currentTree, currentNodeId, analysisByTurn, streamStatus, streamError } from './state/appState'
@@ -15,14 +15,22 @@ const connectionErrorMessage = signal<string | null>(null)
 const sgfError = signal<string | null>(null)
 const lastLoadedSgfContent = signal<string | null>(null)
 
-function loadGame(content: string) {
+let closeCurrentStream: (() => void) | null = null
+
+export function loadGame(content: string) {
+  closeCurrentStream?.()
+  closeCurrentStream = null
+
   lastLoadedSgfContent.value = content
   sgfError.value = null
   let tree
   try {
     tree = parseSgf(content)
+    getBoardSize(tree) // validates board size (throws SgfParseError for rectangular boards) before any state is committed
   } catch (err) {
     sgfError.value = err instanceof SgfParseError ? err.message : 'Не удалось разобрать SGF'
+    streamStatus.value = 'idle'
+    streamError.value = null
     return
   }
 
@@ -32,11 +40,13 @@ function loadGame(content: string) {
   streamStatus.value = 'streaming'
   streamError.value = null
 
+  const mainLineIds = mainLineNodeIds(tree)
   const request = buildStreamRequest(tree, { maxVisits: DEFAULT_MAX_VISITS })
-  streamAnalysis(request, {
+  closeCurrentStream = streamAnalysis(request, {
     onProgress(msg) {
+      const nodeId = mainLineIds[msg.turnNumber]
       const next = new Map(analysisByTurn.value)
-      next.set(msg.turnNumber, msg.result)
+      next.set(nodeId, msg.result)
       analysisByTurn.value = next
     },
     onDone() {

@@ -34,7 +34,7 @@ describe('currentBoardPosition', () => {
 })
 
 describe('currentTurnNumber + currentMoveAnalysis', () => {
-  it('looks up the analysis for the turn matching the current node', () => {
+  it('looks up the analysis keyed by the current node id', () => {
     const tree = parseSgf(fixtureContent)
     const leaf = findMainLineLeaf(tree)
     currentTree.value = tree
@@ -44,8 +44,29 @@ describe('currentTurnNumber + currentMoveAnalysis', () => {
     expect(currentMoveAnalysis.value).toBeNull()
 
     const fakeResponse = { id: 'x', moveInfos: [], rootInfo: { winrate: 0.6, scoreLead: 1, visits: 10 } }
-    analysisByTurn.value = new Map([[1, fakeResponse]])
+    analysisByTurn.value = new Map([[leaf.id, fakeResponse]])
 
+    expect(currentMoveAnalysis.value).toEqual(fakeResponse)
+  })
+
+  it('returns null for an off-main-line node even when the main line has analysis at the same depth', () => {
+    // Two variations after the first move: (;B[ee](;W[ec])(;W[gc]))
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee](;W[ec])(;W[gc]))')
+    type Node = { id: number; children: Node[] }
+    const bMoveNode = (tree.root as Node).children[0]
+    const mainLineVariation = bMoveNode.children[0] // W[ec] - main line (first child)
+    const otherVariation = bMoveNode.children[1] // W[gc] - off main line
+
+    currentTree.value = tree
+
+    const fakeResponse = { id: 'x', moveInfos: [], rootInfo: { winrate: 0.6, scoreLead: 1, visits: 10 } }
+    // Only the main-line node at this depth was ever analyzed (as buildStreamRequest only streams the main line).
+    analysisByTurn.value = new Map([[mainLineVariation.id, fakeResponse]])
+
+    currentNodeId.value = otherVariation.id
+    expect(currentMoveAnalysis.value).toBeNull()
+
+    currentNodeId.value = mainLineVariation.id
     expect(currentMoveAnalysis.value).toEqual(fakeResponse)
   })
 })

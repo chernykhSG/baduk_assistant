@@ -51,7 +51,7 @@ export function getBoardSize(tree: GameTree): number {
   const szValue = (tree.root as NodeObject).data.SZ?.[0]
   if (!szValue) return 19
   if (szValue.includes(':')) {
-    throw new Error(`Rectangular boards (SZ=${szValue}) are not supported in Phase 1`)
+    throw new SgfParseError(`Rectangular boards (SZ=${szValue}) are not supported in Phase 1`)
   }
   return parseInt(szValue, 10)
 }
@@ -62,6 +62,18 @@ export function findMainLineLeaf(tree: GameTree): NodeObject {
     node = node.children[0]
   }
   return node
+}
+
+/** Node ids along the main line, in order from root (index 0) to the leaf (last index) — index i is the node at turn i. */
+export function mainLineNodeIds(tree: GameTree): number[] {
+  const ids: number[] = []
+  let node = tree.root as NodeObject
+  ids.push(node.id)
+  while (node.children.length > 0) {
+    node = node.children[0]
+    ids.push(node.id)
+  }
+  return ids
 }
 
 export function movesFromRootToNode(
