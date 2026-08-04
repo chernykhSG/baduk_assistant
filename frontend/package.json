@@ -24,6 +24,8 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@preact/signals": "^2.10.1",
+    "@sabaki/immutable-gametree": "^1.9.4",
+    "@sabaki/sgf": "^3.5.0",
     "preact": "^10.29.8"
   },
   "devDependencies": {
