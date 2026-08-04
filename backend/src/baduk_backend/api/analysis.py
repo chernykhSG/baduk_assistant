@@ -1,10 +1,19 @@
 import asyncio
+import secrets
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
+from pydantic import ValidationError
 
-from baduk_backend.api.schemas import AnalyzeRequest, AnalyzeResponse
-from baduk_backend.auth import require_valid_token
+from baduk_backend.api.schemas import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    DoneMessage,
+    ErrorMessage,
+    ProgressMessage,
+    StreamAnalyzeRequest,
+)
+from baduk_backend.auth import AUTH_TOKEN, require_valid_token
 from baduk_backend.engine_manager import EngineManager, KataGoCrashError
 
 router = APIRouter()
@@ -36,3 +45,47 @@ async def analyze(
         except KataGoCrashError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
     return AnalyzeResponse.model_validate(response)
+
+
+@router.websocket("/api/analyze/stream")
+async def analyze_stream(websocket: WebSocket) -> None:
+    token = websocket.query_params.get("token")
+    await websocket.accept()
+    if token is None or not secrets.compare_digest(token, AUTH_TOKEN):
+        await websocket.close(code=1008)
+        return
+
+    engine_manager: EngineManager = websocket.app.state.engine_manager
+    lock: asyncio.Lock = websocket.app.state.engine_lock
+
+    try:
+        raw = await websocket.receive_json()
+        stream_request = StreamAnalyzeRequest.model_validate(raw)
+    except (ValidationError, ValueError):
+        await websocket.send_json(ErrorMessage(detail="invalid request").model_dump())
+        await websocket.close()
+        return
+
+    base_request = stream_request.model_dump(exclude={"turnNumbers"})
+    total = len(stream_request.turnNumbers)
+
+    for turn_number in stream_request.turnNumbers:
+        request_dict = dict(base_request)
+        request_dict["id"] = str(uuid.uuid4())
+        request_dict["analyzeTurns"] = [turn_number]
+        try:
+            async with lock:
+                response = await asyncio.to_thread(engine_manager.analyze, request_dict)
+        except KataGoCrashError as exc:
+            await websocket.send_json(ErrorMessage(detail=str(exc)).model_dump())
+            await websocket.close()
+            return
+        message = ProgressMessage(
+            turnNumber=turn_number,
+            total=total,
+            result=AnalyzeResponse.model_validate(response),
+        )
+        await websocket.send_json(message.model_dump())
+
+    await websocket.send_json(DoneMessage().model_dump())
+    await websocket.close()
