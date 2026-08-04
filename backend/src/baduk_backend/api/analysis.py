@@ -1,5 +1,4 @@
 import asyncio
-import secrets
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
@@ -13,7 +12,7 @@ from baduk_backend.api.schemas import (
     ProgressMessage,
     StreamAnalyzeRequest,
 )
-from baduk_backend.auth import AUTH_TOKEN, require_valid_token
+from baduk_backend.auth import require_valid_token, token_matches
 from baduk_backend.engine_manager import EngineManager, KataGoCrashError
 
 router = APIRouter()
@@ -42,8 +41,10 @@ async def analyze(
     async with lock:
         try:
             response = await asyncio.to_thread(engine_manager.analyze, request_dict)
-        except KataGoCrashError as exc:
+        except (KataGoCrashError, TimeoutError, ValueError) as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+        if "error" in response:
+            raise HTTPException(status_code=502, detail=response["error"])
     return AnalyzeResponse.model_validate(response)
 
 
@@ -51,7 +52,7 @@ async def analyze(
 async def analyze_stream(websocket: WebSocket) -> None:
     token = websocket.query_params.get("token")
     await websocket.accept()
-    if token is None or not secrets.compare_digest(token, AUTH_TOKEN):
+    if not token_matches(token):
         await websocket.close(code=1008)
         return
 
@@ -76,8 +77,12 @@ async def analyze_stream(websocket: WebSocket) -> None:
         try:
             async with lock:
                 response = await asyncio.to_thread(engine_manager.analyze, request_dict)
-        except KataGoCrashError as exc:
+        except (KataGoCrashError, TimeoutError, ValueError) as exc:
             await websocket.send_json(ErrorMessage(detail=str(exc)).model_dump())
+            await websocket.close()
+            return
+        if "error" in response:
+            await websocket.send_json(ErrorMessage(detail=response["error"]).model_dump())
             await websocket.close()
             return
         message = ProgressMessage(

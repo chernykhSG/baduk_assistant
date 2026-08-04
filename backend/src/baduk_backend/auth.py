@@ -5,8 +5,14 @@ from fastapi import Header, HTTPException
 AUTH_TOKEN = secrets.token_urlsafe(32)
 
 
+def token_matches(token: str | None) -> bool:
+    if token is None:
+        return False
+    return secrets.compare_digest(token.encode(), AUTH_TOKEN.encode())
+
+
 def verify_token(token: str | None) -> None:
-    if token is None or not secrets.compare_digest(token, AUTH_TOKEN):
+    if not token_matches(token):
         raise HTTPException(status_code=401, detail="invalid token")
 
 
