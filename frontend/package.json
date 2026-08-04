@@ -27,6 +27,7 @@
     "@sabaki/go-board": "^1.4.3",
     "@sabaki/immutable-gametree": "^1.9.4",
     "@sabaki/sgf": "^3.5.0",
+    "@sabaki/shudan": "^1.8.0",
     "preact": "^10.29.8"
   },
   "devDependencies": {

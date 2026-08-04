@@ -26,6 +26,9 @@ importers:
       '@sabaki/sgf':
         specifier: ^3.5.0
         version: 3.5.0
+      '@sabaki/shudan':
+        specifier: ^1.8.0
+        version: 1.8.0(preact@10.29.8)
       preact:
         specifier: ^10.29.8
         version: 10.29.8
@@ -936,6 +939,11 @@ packages:
   '@sabaki/sgf@3.5.0':
     resolution: {integrity: sha512-KAkgUFe/A7jc4xZtUBAhDeH6IqPYMHoKts6nXhYHNCvBud4DChJ9EpKLDCeWuVijb960FCXvhBfAy6OkdZZpfA==}
 
+  '@sabaki/shudan@1.8.0':
+    resolution: {integrity: sha512-FeyfSnGgOsxpoB6wujYJwJL4IBT4p/hiA8y/XVhZuxV5z/UxekGpYvuyHzw1V1brMLxUSuJsFrCUg+2TLGEt7Q==}
+    peerDependencies:
+      preact: ^8.4.2 || 10.x
+
   '@sindresorhus/is@4.6.0':
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
     engines: {node: '>=10'}
@@ -1309,6 +1317,9 @@ packages:
   ci-info@4.4.0:
     resolution: {integrity: sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg==}
     engines: {node: '>=8'}
+
+  classnames@2.5.1:
+    resolution: {integrity: sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow==}
 
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
@@ -3634,6 +3645,11 @@ snapshots:
       iconv-lite: 0.4.24
       jschardet: 2.3.0
 
+  '@sabaki/shudan@1.8.0(preact@10.29.8)':
+    dependencies:
+      classnames: 2.5.1
+      preact: 10.29.8
+
   '@sindresorhus/is@4.6.0': {}
 
   '@standard-schema/spec@1.1.0': {}
@@ -4106,6 +4122,8 @@ snapshots:
   ci-info@4.3.1: {}
 
   ci-info@4.4.0: {}
+
+  classnames@2.5.1: {}
 
   cliui@8.0.1:
     dependencies:
