@@ -41,7 +41,7 @@ def _find_free_port() -> int:
         return sock.getsockname()[1]
 
 
-def _build_engine_manager() -> EngineManager:
+def _build_engine_manager() -> tuple[EngineManager, str]:
     katago_binary = os.environ.get("BADUK_KATAGO_BINARY")
     katago_model = os.environ.get("BADUK_KATAGO_MODEL")
     if not katago_binary or not katago_model:
@@ -59,18 +59,26 @@ def _build_engine_manager() -> EngineManager:
         config_path=config_path,
         model_path=katago_model,
     )
-    return EngineManager(command)
+    return EngineManager(command), config_path
 
 
 def run() -> None:
     import uvicorn
 
-    app.state.engine_manager = _build_engine_manager()
+    engine_manager, config_path = _build_engine_manager()
+    app.state.engine_manager = engine_manager
     app.state.engine_lock = asyncio.Lock()
 
     port = _find_free_port()
     print(build_startup_message(port, AUTH_TOKEN), flush=True)
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    try:
+        uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    finally:
+        engine_manager.stop()
+        try:
+            os.remove(config_path)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
