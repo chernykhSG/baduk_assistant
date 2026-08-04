@@ -1,16 +1,22 @@
+import { useState } from 'preact/hooks'
 import { Goban } from '@sabaki/shudan'
 import '@sabaki/shudan/css/goban.css'
 import { currentBoardPosition, currentMoveAnalysis } from '../state/appState'
 
-function ownershipToHeatMap(ownership: number[] | undefined, boardSize: number): (null | { strength: number; text: string })[][] | undefined {
+function ownershipToHeatMap(
+  ownership: number[] | undefined,
+  boardSize: number,
+  hoveredVertex: [number, number] | null
+): (null | { strength: number; text?: string })[][] | undefined {
   if (!ownership) return undefined
-  const grid: (null | { strength: number; text: string })[][] = []
+  const grid: (null | { strength: number; text?: string })[][] = []
   for (let y = 0; y < boardSize; y++) {
-    const row: (null | { strength: number; text: string })[] = []
+    const row: (null | { strength: number; text?: string })[] = []
     for (let x = 0; x < boardSize; x++) {
       const value = ownership[y * boardSize + x]
       const strength = Math.min(9, Math.max(1, Math.ceil(Math.abs(value) * 9)))
-      row.push({ strength, text: value.toFixed(2) })
+      const isHovered = hoveredVertex !== null && hoveredVertex[0] === x && hoveredVertex[1] === y
+      row.push(isHovered ? { strength, text: value.toFixed(2) } : { strength })
     }
     grid.push(row)
   }
@@ -42,6 +48,7 @@ function pvToLines(
 }
 
 export function BoardView() {
+  const [hoveredVertex, setHoveredVertex] = useState<[number, number] | null>(null)
   const position = currentBoardPosition.value
   const analysis = currentMoveAnalysis.value
 
@@ -49,9 +56,18 @@ export function BoardView() {
     return <div class="board-view board-view--empty">Откройте SGF-файл, чтобы начать</div>
   }
 
-  const heatMap = ownershipToHeatMap(analysis?.ownership, position.boardSize)
+  const heatMap = ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex)
   const topMove = analysis?.moveInfos[0]
   const lines = pvToLines(topMove?.pv, position.boardSize)
 
-  return <Goban signMap={position.signMap} heatMap={heatMap} lines={lines} vertexSize={24} />
+  return (
+    <Goban
+      signMap={position.signMap}
+      heatMap={heatMap}
+      lines={lines}
+      vertexSize={24}
+      onVertexPointerEnter={(_event, vertex) => setHoveredVertex(vertex as [number, number])}
+      onVertexPointerLeave={() => setHoveredVertex(null)}
+    />
+  )
 }
