@@ -18,6 +18,11 @@ export function mapSgfRules(ruValue: string | undefined): string {
   return normalized && KNOWN_RULES.includes(normalized) ? normalized : 'chinese'
 }
 
+function extractKomi(tree: GameTree): number {
+  const parsed = tree.root.data.KM ? parseFloat(tree.root.data.KM[0]) : NaN
+  return Number.isFinite(parsed) ? parsed : 7.5
+}
+
 function gtpMoves(tree: GameTree, nodeId: number, boardSize: number): [string, string][] {
   return movesFromRootToNode(tree, nodeId).map(({ color, sgfCoord }) => [
     color,
@@ -35,7 +40,7 @@ export function buildAnalyzeRequest(
   return {
     moves,
     rules: mapSgfRules(tree.root.data.RU?.[0]),
-    komi: tree.root.data.KM ? parseFloat(tree.root.data.KM[0]) : 7.5,
+    komi: extractKomi(tree),
     boardXSize: boardSize,
     boardYSize: boardSize,
     analyzeTurns: [moves.length],
@@ -51,7 +56,7 @@ export function buildStreamRequest(tree: GameTree, options: { maxVisits: number 
   return {
     moves,
     rules: mapSgfRules(tree.root.data.RU?.[0]),
-    komi: tree.root.data.KM ? parseFloat(tree.root.data.KM[0]) : 7.5,
+    komi: extractKomi(tree),
     boardXSize: boardSize,
     boardYSize: boardSize,
     turnNumbers: Array.from({ length: moves.length + 1 }, (_, i) => i),

@@ -49,6 +49,12 @@ describe('buildAnalyzeRequest', () => {
       includeOwnership: true,
     })
   })
+
+  it('falls back to 7.5 komi when KM is present but empty', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[19]KM[];B[qd])')
+    const request = buildAnalyzeRequest(tree, tree.root.children[0].id, { maxVisits: 500 })
+    expect(request.komi).toBe(7.5)
+  })
 })
 
 describe('buildStreamRequest', () => {
