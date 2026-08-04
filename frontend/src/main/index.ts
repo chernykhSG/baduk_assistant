@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { startBackend, type BackendConnection } from './backendConnection'
+import { startBackend, stopBackend, type BackendConnection } from './backendConnection'
 
 let backendConnectionPromise: Promise<BackendConnection> | null = null
 
@@ -80,6 +80,12 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// Terminate the backend sidecar process when the app is quitting, so it
+// doesn't outlive the Electron process.
+app.on('before-quit', () => {
+  stopBackend()
 })
 
 // In this file you can include the rest of your app's specific main process

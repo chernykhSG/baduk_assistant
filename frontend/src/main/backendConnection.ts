@@ -6,11 +6,14 @@ export interface BackendConnection {
   token: string
 }
 
+let currentBackendProcess: ChildProcess | null = null
+
 export function startBackend(
   command: string = process.env.BADUK_BACKEND_COMMAND ?? 'baduk-backend'
 ): Promise<BackendConnection> {
   return new Promise((resolve, reject) => {
     const child: ChildProcess = spawn(command, [], { shell: true })
+    currentBackendProcess = child
     let settled = false
 
     if (!child.stdout) {
@@ -37,6 +40,7 @@ export function startBackend(
     child.on('exit', (code) => {
       if (!settled) {
         settled = true
+        rl.close()
         reject(new Error(`Backend process exited with code ${code} before reporting a connection`))
       }
     })
@@ -44,8 +48,26 @@ export function startBackend(
     child.on('error', (err) => {
       if (!settled) {
         settled = true
+        rl.close()
         reject(err)
       }
     })
   })
+}
+
+export function stopBackend(): void {
+  const child = currentBackendProcess
+  currentBackendProcess = null
+  if (!child || !child.pid) return
+
+  if (process.platform === 'win32') {
+    // On Windows, spawn(..., { shell: true }) launches the command via
+    // cmd.exe, so `child.pid` is the shell's PID, not the actual backend
+    // process's PID. child.kill() would only terminate that shell wrapper
+    // and leave the real backend process (a grandchild) running orphaned.
+    // /t kills the whole process tree rooted at that PID.
+    spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'])
+  } else {
+    child.kill()
+  }
 }
