@@ -40,7 +40,8 @@
 - [x] Детальный implementation-план API-слоя — `docs/superpowers/plans/2026-08-03-phase-1-backend-api.md` (5 задач: Pydantic-схемы, drain-фикс EngineManager, `POST /api/analyze`+wiring, `WS /api/analyze/stream`, real-KataGo integration-тест через HTTP).
 - [x] Выполнить план API-слоя через `subagent-driven-development` (5 задач + финальное ревью + один fix-wave, всё чисто).
 - [x] Ветка `phase-1-backend-api` смёржена в `main` локально (fast-forward) через `superpowers:finishing-a-development-branch`, удалена.
-- [ ] Вернуться в `phase-1-frontend` (или rebase на текущий `main`) и продолжить: board+SGF, затем IPC-клиент+overlay-панели+сквозная приёмка.
+- [x] Ветка `phase-1-frontend` перебазирована на текущий `main` (единственный старый коммит был устаревшей правкой `task_plan.md`, полностью перекрыт — rebase дал пустой коммит, автоматически отброшен git; ветка сейчас идентична `main`).
+- [ ] Brainstorming frontend-части Фазы 1 — теперь с конкретными backend-интерфейсами (`POST /api/analyze`/`WS /api/analyze/stream`, форматы схем, токен-аутентификация) вместо гипотетических.
 
 ## Будущие задачи (backlog)
 
