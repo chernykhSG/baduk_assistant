@@ -33,3 +33,12 @@ $env:BADUK_KATAGO_BINARY = "C:/path/to/katago.exe"
 $env:BADUK_KATAGO_MODEL = "C:/path/to/model.bin.gz"
 uv run pytest -v -m integration
 ```
+
+## API
+
+- `POST /api/analyze` — анализ одной позиции. Тело запроса и ответ — см.
+  `backend/src/baduk_backend/api/schemas.py` (`AnalyzeRequest`/`AnalyzeResponse`).
+  Требует заголовок `X-Auth-Token`. `503`, если процесс KataGo упал.
+- `WS /api/analyze/stream?token=...` — потоковый анализ партии, прогресс по
+  ходам (`StreamAnalyzeRequest` на входе, `progress`/`done`/`error` сообщения
+  на выходе). Неверный/отсутствующий токен → закрытие соединения кодом `1008`.
