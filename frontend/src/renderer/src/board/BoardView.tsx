@@ -9,5 +9,5 @@ export function BoardView() {
     return <div class="board-view board-view--empty">Откройте SGF-файл, чтобы начать</div>
   }
 
-  return <Goban signMap={position.signMap as (0 | 1 | -1)[][]} vertexSize={24} />
+  return <Goban signMap={position.signMap} vertexSize={24} />
 }

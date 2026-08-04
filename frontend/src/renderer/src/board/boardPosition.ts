@@ -12,7 +12,7 @@ export function sgfCoordToVertex(sgfCoord: string | null): [number, number] | nu
 export function boardPositionFromMoves(
   tree: GameTree,
   nodeId: number
-): { signMap: number[][]; boardSize: number } {
+): { signMap: (0 | 1 | -1)[][]; boardSize: number } {
   const boardSize = getBoardSize(tree)
   let board = Board.fromDimensions(boardSize)
 
