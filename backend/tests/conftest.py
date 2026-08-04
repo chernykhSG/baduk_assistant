@@ -51,3 +51,14 @@ def fake_engine_client_crash():
         manager.stop()
         del app.state.engine_manager
         del app.state.engine_lock
+
+
+@pytest.fixture
+def slow_fake_engine_app():
+    manager = _wire_app_state([sys.executable, str(FIXTURES_DIR / "slow_fake_katago.py")])
+    try:
+        yield app
+    finally:
+        manager.stop()
+        del app.state.engine_manager
+        del app.state.engine_lock
