@@ -28,7 +28,8 @@
     "@sabaki/immutable-gametree": "^1.9.4",
     "@sabaki/sgf": "^3.5.0",
     "@sabaki/shudan": "^1.8.0",
-    "preact": "^10.29.8"
+    "preact": "^10.29.8",
+    "uplot": "^1.6.32"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
