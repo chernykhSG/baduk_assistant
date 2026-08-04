@@ -1,3 +1,4 @@
+import json
 import sys
 import time
 from pathlib import Path
@@ -85,5 +86,20 @@ def test_manager_recovers_after_crash_with_working_command():
     try:
         response = manager.analyze({"id": "test-5", "moves": []})
         assert response["id"] == "test-5"
+    finally:
+        manager.stop()
+
+
+def test_analyze_drains_stale_response_left_by_prior_timeout():
+    # Regression test: if a prior analyze() call raised TimeoutError, its late
+    # response can still land in the queue afterwards. Without draining it
+    # first, the next analyze() call reads that stale line instead of its own
+    # response and raises a spurious "Unexpected response id" ValueError.
+    manager = EngineManager(fake_katago_command())
+    try:
+        manager.start()
+        manager._stdout_queue.put(json.dumps({"id": "stale-response", "moveInfos": []}))
+        response = manager.analyze({"id": "fresh-request", "moves": []})
+        assert response["id"] == "fresh-request"
     finally:
         manager.stop()

@@ -92,9 +92,20 @@ class EngineManager:
             self._close_pipes()
             self._process = None
 
+    def _drain_stale_queue(self) -> None:
+        # A prior call that hit TimeoutError may still have its late response
+        # sitting in the queue; drop it so it can't be mistaken for the
+        # answer to the next, unrelated request.
+        while True:
+            try:
+                self._stdout_queue.get_nowait()
+            except queue.Empty:
+                break
+
     def analyze(self, request: dict, timeout: float = 30.0) -> dict:
         if not self.is_running():
             self.start()
+        self._drain_stale_queue()
         assert self._process is not None
         assert self._process.stdin is not None
         request_id = request["id"]
