@@ -233,8 +233,8 @@ code {
 }
 .variation-tree__node {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
 }
 .variation-tree__children {
   display: flex;

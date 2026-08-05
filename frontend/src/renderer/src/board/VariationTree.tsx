@@ -36,15 +36,22 @@ export function VariationTree() {
   const tree = currentTree.value
   const nodeId = currentNodeId.value
   const currentRef = useRef<HTMLButtonElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     currentRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [nodeId])
 
-  if (!tree) return <div class="variation-tree" />
+  // Focus the tree as soon as a game loads (a new tree object), so
+  // arrow-key navigation works immediately instead of requiring a click first.
+  useEffect(() => {
+    containerRef.current?.focus()
+  }, [tree])
+
+  if (!tree) return <div class="variation-tree" ref={containerRef} />
 
   return (
-    <div class="variation-tree" tabIndex={0} onKeyDown={handleKeyDown}>
+    <div class="variation-tree" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown}>
       {renderNode(tree.root)}
     </div>
   )
