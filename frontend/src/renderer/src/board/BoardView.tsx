@@ -8,6 +8,7 @@ const MAX_SUGGESTED_MOVES = 5
 
 function useContainerSize(): [(el: HTMLDivElement | null) => void, { width: number; height: number }] {
   const [size, setSize] = useState({ width: 0, height: 0 })
+  const sizeRef = useRef(size)
   const observerRef = useRef<ResizeObserver | null>(null)
 
   const setRef = (el: HTMLDivElement | null): void => {
@@ -17,8 +18,18 @@ function useContainerSize(): [(el: HTMLDivElement | null) => void, { width: numb
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (!entry) return
-      const { width, height } = entry.contentRect
-      setSize({ width, height })
+      // Round to whole pixels and skip no-op updates: BoundedGoban renders
+      // a board smaller than or equal to this container (it never grows
+      // it), but sub-pixel/rounding jitter in contentRect between renders
+      // was enough to keep re-triggering this observer on every frame —
+      // Chrome's "ResizeObserver loop completed with undelivered
+      // notifications" warning, logged thousands of times a session,
+      // pegging the renderer busy and starving real UI updates.
+      const width = Math.round(entry.contentRect.width)
+      const height = Math.round(entry.contentRect.height)
+      if (width === sizeRef.current.width && height === sizeRef.current.height) return
+      sizeRef.current = { width, height }
+      setSize(sizeRef.current)
     })
     observer.observe(el)
     observerRef.current = observer
