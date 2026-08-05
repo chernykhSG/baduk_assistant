@@ -47,7 +47,10 @@ export function WinrateChart() {
       // Move the chart's cursor/legend to whatever move is currently
       // selected on the board, instead of only updating on mouse hover —
       // stepping through the tree should show that move's numbers without
-      // having to separately point at the chart.
+      // having to separately point at the chart. setCursor() alone moves
+      // the crosshair line but does NOT refresh the legend text (that's
+      // driven by uPlot's own pointer-tracking, not the cursor position) —
+      // setLegend() is the API that actually updates the displayed values.
       const nodeId = currentNodeId.value
       const index = nodeId === null ? -1 : xs.indexOf(nodeId)
       if (index !== -1) {
@@ -55,6 +58,7 @@ export function WinrateChart() {
           left: plot.valToPos(xs[index], 'x'),
           top: plot.valToPos(winrates[index], 'y'),
         })
+        plot.setLegend({ idx: index })
       }
     })
 
