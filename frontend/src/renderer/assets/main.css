@@ -247,22 +247,25 @@ code {
 }
 
 .variation-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 8px;
 }
-.variation-tree__node {
+.variation-tree__children {
+  display: flex;
+  gap: 10px;
+}
+.variation-tree__branch {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-}
-.variation-tree__children {
-  display: flex;
-  flex-direction: column;
-  margin-left: 13px;
-  padding-left: 6px;
+  margin-left: 6px;
+  padding-left: 7px;
   border-left: 1px solid var(--border-color, #333);
 }
 .variation-tree__marker {
