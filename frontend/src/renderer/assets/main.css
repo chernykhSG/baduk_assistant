@@ -269,6 +269,9 @@ code {
   border-left: 1px solid var(--border-color, #333);
 }
 .variation-tree__marker {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
   flex-shrink: 0;
   width: 14px;
   height: 14px;
