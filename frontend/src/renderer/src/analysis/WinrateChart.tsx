@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'preact/hooks'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import { effect } from '@preact/signals'
-import { analysisByTurn } from '../state/appState'
+import { analysisByTurn, currentNodeId } from '../state/appState'
 
 export function WinrateChart() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -40,7 +40,22 @@ export function WinrateChart() {
       const xs = entries.map(([turn]) => turn)
       const winrates = entries.map(([, r]) => r.rootInfo.winrate * 100)
       const scoreLeads = entries.map(([, r]) => r.rootInfo.scoreLead)
-      plotRef.current?.setData([xs, winrates, scoreLeads])
+      const plot = plotRef.current
+      if (!plot) return
+      plot.setData([xs, winrates, scoreLeads])
+
+      // Move the chart's cursor/legend to whatever move is currently
+      // selected on the board, instead of only updating on mouse hover —
+      // stepping through the tree should show that move's numbers without
+      // having to separately point at the chart.
+      const nodeId = currentNodeId.value
+      const index = nodeId === null ? -1 : xs.indexOf(nodeId)
+      if (index !== -1) {
+        plot.setCursor({
+          left: plot.valToPos(xs[index], 'x'),
+          top: plot.valToPos(winrates[index], 'y'),
+        })
+      }
     })
 
     // uPlot's canvas is a fixed pixel size set once at construction — it
