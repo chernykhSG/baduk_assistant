@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'preact/hooks'
 import { currentTree, currentNodeId } from '../state/appState'
 import type { NodeObject } from './sgfLoader'
 
@@ -33,6 +34,13 @@ function handleKeyDown(event: KeyboardEvent) {
 
 export function VariationTree() {
   const tree = currentTree.value
+  const nodeId = currentNodeId.value
+  const currentRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    currentRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [nodeId])
+
   if (!tree) return <div class="variation-tree" />
 
   return (
@@ -42,16 +50,23 @@ export function VariationTree() {
   )
 
   function renderNode(node: NodeObject) {
-    const isCurrent = node.id === currentNodeId.value
+    const isCurrent = node.id === nodeId
+    const colorClass = node.data.B
+      ? 'variation-tree__marker--black'
+      : node.data.W
+        ? 'variation-tree__marker--white'
+        : 'variation-tree__marker--root'
+    const label = node.data.B ? `B ${node.data.B[0]}` : node.data.W ? `W ${node.data.W[0]}` : 'root'
     return (
       <div class="variation-tree__node" key={node.id}>
         <button
+          ref={isCurrent ? currentRef : undefined}
           type="button"
-          class={isCurrent ? 'variation-tree__marker variation-tree__marker--current' : 'variation-tree__marker'}
+          class={`variation-tree__marker ${colorClass}${isCurrent ? ' variation-tree__marker--current' : ''}`}
           onClick={() => (currentNodeId.value = node.id)}
-        >
-          {node.data.B ? `B ${node.data.B[0]}` : node.data.W ? `W ${node.data.W[0]}` : '·'}
-        </button>
+          title={label}
+          aria-label={label}
+        />
         {node.children.length > 0 && (
           <div class="variation-tree__children">{node.children.map((child: NodeObject) => renderNode(child))}</div>
         )}

@@ -31,6 +31,24 @@ if (typeof (globalThis as { Path2D?: unknown }).Path2D === 'undefined') {
   ;(globalThis as unknown as { Path2D: unknown }).Path2D = Path2DStub
 }
 
+// jsdom does not implement ResizeObserver, which BoardView uses to size the
+// board to its container. A no-op stand-in is enough since tests don't
+// assert on measured pixel dimensions.
+if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === 'undefined') {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  ;(globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub
+}
+
+// jsdom does not implement Element.scrollIntoView, which VariationTree calls
+// to keep the current move visible as the user navigates.
+if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = function (): void {}
+}
+
 // jsdom does not implement a real 2D canvas rendering context (that requires
 // the native "canvas" package). uplot draws its chart on a <canvas> during
 // rendering, so provide a no-op 2D context stub — sufficient for tests that
