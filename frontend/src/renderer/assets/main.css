@@ -157,19 +157,118 @@ code {
   display: grid;
   grid-template-rows: 1fr auto;
   height: 100vh;
+  min-height: 0;
 }
 .app-shell__top {
   display: grid;
   grid-template-columns: minmax(160px, 220px) 1fr;
   gap: 8px;
   overflow: hidden;
+  min-height: 0;
+}
+.app-shell__tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.app-shell__board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
 }
 .app-shell__chart {
   border-top: 1px solid var(--border-color, #333);
+}
+.app-shell__banner {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  z-index: 1;
+}
+.app-shell__banner--error {
+  background: #4a1414;
+  color: #ffb4b4;
+  border: 1px solid #7a2222;
+}
+.app-shell__banner--error button {
+  margin-left: 8px;
 }
 .connection-gate {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100vh;
+}
+.connection-gate--error {
+  color: #ffb4b4;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.board-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.board-view--empty {
+  color: var(--ev-c-text-2, #888);
+}
+
+.variation-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+}
+.variation-tree__node {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.variation-tree__children {
+  display: flex;
+  flex-direction: column;
+  margin-left: 13px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border-color, #333);
+}
+.variation-tree__marker {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 3px 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #666;
+  cursor: pointer;
+}
+.variation-tree__marker--black {
+  background: #111;
+  border-color: #000;
+}
+.variation-tree__marker--white {
+  background: #eee;
+  border-color: #999;
+}
+.variation-tree__marker--root {
+  background: transparent;
+}
+.variation-tree__marker--current {
+  outline: 2px solid #4dabf7;
+  outline-offset: 1px;
+}
+
+.winrate-chart {
+  padding: 4px 8px;
 }

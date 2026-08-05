@@ -1,7 +1,46 @@
-import { useState } from 'preact/hooks'
-import { Goban } from '@sabaki/shudan'
+import { useEffect, useRef, useState } from 'preact/hooks'
+import { BoundedGoban } from '@sabaki/shudan'
 import '@sabaki/shudan/css/goban.css'
 import { currentBoardPosition, currentMoveAnalysis } from '../state/appState'
+
+function useContainerSize(): [(el: HTMLDivElement | null) => void, { width: number; height: number }] {
+  const [size, setSize] = useState({ width: 0, height: 0 })
+  const observerRef = useRef<ResizeObserver | null>(null)
+
+  const setRef = (el: HTMLDivElement | null): void => {
+    observerRef.current?.disconnect()
+    observerRef.current = null
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const { width, height } = entry.contentRect
+      setSize({ width, height })
+    })
+    observer.observe(el)
+    observerRef.current = observer
+  }
+
+  useEffect(() => () => observerRef.current?.disconnect(), [])
+
+  return [setRef, size]
+}
+
+function lastMoveToMarkerMap(
+  lastMoveVertex: [number, number] | null,
+  boardSize: number
+): (null | { type: 'point' })[][] | undefined {
+  if (!lastMoveVertex) return undefined
+  const grid: (null | { type: 'point' })[][] = []
+  for (let y = 0; y < boardSize; y++) {
+    const row: (null | { type: 'point' })[] = []
+    for (let x = 0; x < boardSize; x++) {
+      row.push(x === lastMoveVertex[0] && y === lastMoveVertex[1] ? { type: 'point' } : null)
+    }
+    grid.push(row)
+  }
+  return grid
+}
 
 function ownershipToHeatMap(
   ownership: number[] | undefined,
@@ -49,25 +88,41 @@ function pvToLines(
 
 export function BoardView() {
   const [hoveredVertex, setHoveredVertex] = useState<[number, number] | null>(null)
+  const [containerRef, containerSize] = useContainerSize()
   const position = currentBoardPosition.value
   const analysis = currentMoveAnalysis.value
 
   if (!position) {
-    return <div class="board-view board-view--empty">Откройте SGF-файл, чтобы начать</div>
+    return (
+      <div class="board-view board-view--empty" ref={containerRef}>
+        Откройте SGF-файл, чтобы начать
+      </div>
+    )
   }
 
   const heatMap = ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex)
+  const markerMap = lastMoveToMarkerMap(position.lastMoveVertex, position.boardSize)
   const topMove = analysis?.moveInfos[0]
   const lines = pvToLines(topMove?.pv, position.boardSize)
 
+  // Before the first ResizeObserver callback (or in test environments, where
+  // jsdom never performs real layout and none ever fires), fall back to a
+  // fixed size so the board still renders instead of collapsing to nothing.
+  const maxWidth = containerSize.width || 600
+  const maxHeight = containerSize.height || 600
+
   return (
-    <Goban
-      signMap={position.signMap}
-      heatMap={heatMap}
-      lines={lines}
-      vertexSize={24}
-      onVertexPointerEnter={(_event, vertex) => setHoveredVertex(vertex as [number, number])}
-      onVertexPointerLeave={() => setHoveredVertex(null)}
-    />
+    <div class="board-view" ref={containerRef}>
+      <BoundedGoban
+        signMap={position.signMap}
+        heatMap={heatMap}
+        markerMap={markerMap}
+        lines={lines}
+        maxWidth={maxWidth}
+        maxHeight={maxHeight}
+        onVertexPointerEnter={(_event, vertex) => setHoveredVertex(vertex as [number, number])}
+        onVertexPointerLeave={() => setHoveredVertex(null)}
+      />
+    </div>
   )
 }
