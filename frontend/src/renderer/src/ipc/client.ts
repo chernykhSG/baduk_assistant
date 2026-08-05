@@ -79,6 +79,10 @@ export function streamAnalysis(
   }
 ): () => void {
   let closed = false
+  // Set once a 'done'/'error' message or the 'error' event already reported
+  // the outcome, so the 'close' handler (which always fires afterwards,
+  // even on a graceful end) doesn't report it a second time.
+  let finished = false
   let ws: WebSocket | null = null
 
   getConnection().then(({ port, token }) => {
@@ -90,11 +94,22 @@ export function streamAnalysis(
     ws.addEventListener('message', (event: any) => {
       const msg = JSON.parse(event.data as string)
       if (msg.type === 'progress') handlers.onProgress(msg)
-      else if (msg.type === 'done') handlers.onDone()
-      else if (msg.type === 'error') handlers.onError(msg)
+      else if (msg.type === 'done') {
+        finished = true
+        handlers.onDone()
+      } else if (msg.type === 'error') {
+        finished = true
+        handlers.onError(msg)
+      }
     })
     ws.addEventListener('error', () => {
+      finished = true
       handlers.onError({ type: 'error', detail: 'WebSocket connection error' })
+    })
+    ws.addEventListener('close', (event: any) => {
+      if (finished || closed) return
+      finished = true
+      handlers.onError({ type: 'error', detail: `WebSocket closed unexpectedly (code ${event.code})` })
     })
   })
 
