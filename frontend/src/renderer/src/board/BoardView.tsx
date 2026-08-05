@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { BoundedGoban } from '@sabaki/shudan'
 import '@sabaki/shudan/css/goban.css'
 import { currentBoardPosition, currentMoveAnalysis } from '../state/appState'
+import type { MoveInfo } from '../ipc/client'
+
+const MAX_SUGGESTED_MOVES = 5
 
 function useContainerSize(): [(el: HTMLDivElement | null) => void, { width: number; height: number }] {
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -26,19 +29,29 @@ function useContainerSize(): [(el: HTMLDivElement | null) => void, { width: numb
   return [setRef, size]
 }
 
-function lastMoveToMarkerMap(
+type BoardMarker = { type: 'point' } | { type: 'label'; label: string }
+
+function buildMarkerMap(
   lastMoveVertex: [number, number] | null,
+  suggestedMoves: MoveInfo[] | undefined,
   boardSize: number
-): (null | { type: 'point' })[][] | undefined {
-  if (!lastMoveVertex) return undefined
-  const grid: (null | { type: 'point' })[][] = []
+): (null | BoardMarker)[][] | undefined {
+  if (!lastMoveVertex && !suggestedMoves?.length) return undefined
+  const grid: (null | BoardMarker)[][] = []
   for (let y = 0; y < boardSize; y++) {
-    const row: (null | { type: 'point' })[] = []
-    for (let x = 0; x < boardSize; x++) {
-      row.push(x === lastMoveVertex[0] && y === lastMoveVertex[1] ? { type: 'point' } : null)
-    }
-    grid.push(row)
+    grid.push(new Array(boardSize).fill(null))
   }
+  if (lastMoveVertex) {
+    grid[lastMoveVertex[1]][lastMoveVertex[0]] = { type: 'point' }
+  }
+  // Candidate moves take priority over the last-move marker — they only ever
+  // land on empty vertices, so there's no real overlap, but rank numbers are
+  // the more useful thing to see if one ever did coincide.
+  suggestedMoves?.slice(0, MAX_SUGGESTED_MOVES).forEach((info, index) => {
+    const vertex = gtpToVertex(info.move, boardSize)
+    if (!vertex) return
+    grid[vertex[1]][vertex[0]] = { type: 'label', label: String(index + 1) }
+  })
   return grid
 }
 
@@ -72,20 +85,6 @@ function gtpToVertex(gtpCoord: string, boardSize: number): [number, number] | nu
   return [col, boardSize - row]
 }
 
-function pvToLines(
-  pv: string[] | undefined,
-  boardSize: number
-): { v1: [number, number]; v2: [number, number]; type: 'line' | 'arrow' }[] {
-  if (!pv || pv.length < 2) return []
-  const lines: { v1: [number, number]; v2: [number, number]; type: 'line' | 'arrow' }[] = []
-  for (let i = 0; i < pv.length - 1; i++) {
-    const v1 = gtpToVertex(pv[i], boardSize)
-    const v2 = gtpToVertex(pv[i + 1], boardSize)
-    if (v1 && v2) lines.push({ v1, v2, type: 'line' })
-  }
-  return lines
-}
-
 export function BoardView() {
   const [hoveredVertex, setHoveredVertex] = useState<[number, number] | null>(null)
   const [containerRef, containerSize] = useContainerSize()
@@ -99,9 +98,11 @@ export function BoardView() {
   }
 
   const heatMap = showOwnership ? ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex) : undefined
-  const markerMap = lastMoveToMarkerMap(position.lastMoveVertex, position.boardSize)
-  const topMove = analysis?.moveInfos[0]
-  const lines = showPv ? pvToLines(topMove?.pv, position.boardSize) : []
+  const markerMap = buildMarkerMap(
+    position.lastMoveVertex,
+    showPv ? analysis?.moveInfos : undefined,
+    position.boardSize
+  )
 
   // Before the first ResizeObserver callback (or in test environments, where
   // jsdom never performs real layout and none ever fires), fall back to a
@@ -134,7 +135,6 @@ export function BoardView() {
           signMap={position.signMap}
           heatMap={heatMap}
           markerMap={markerMap}
-          lines={lines}
           maxWidth={maxWidth}
           maxHeight={maxHeight}
           onVertexPointerEnter={(_event, vertex) => setHoveredVertex(vertex as [number, number])}

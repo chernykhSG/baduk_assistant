@@ -68,7 +68,7 @@ describe('BoardView', () => {
     expect(container.querySelector('.shudan-heatlabel')).toBeNull()
   })
 
-  it('draws a PV line from the first two moves of the top candidate', () => {
+  it('marks the top candidate move with its rank number', () => {
     const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee])')
     const leaf = findMainLineLeaf(tree)
     currentTree.value = tree
@@ -85,6 +85,17 @@ describe('BoardView', () => {
     ])
 
     const { container } = render(<BoardView />)
-    expect(container.querySelector('.shudan-line')).toBeTruthy()
+    const markers = Array.from(container.querySelectorAll('.shudan-marker'))
+    expect(markers.some((el) => el.textContent === '1')).toBe(true)
+  })
+
+  it('marks the last-played move on the board', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+
+    const { container } = render(<BoardView />)
+    expect(container.querySelector('.shudan-marker')).toBeTruthy()
   })
 })
