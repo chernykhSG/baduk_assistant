@@ -43,7 +43,7 @@ describe('LlmExplanationPanel', () => {
     expect((getByText('Объяснить эту позицию') as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('shows the explanation summary after a successful call', async () => {
+  it('shows the explanation summary and a verified status after a successful call', async () => {
     loadPosition()
     mockExplainPosition.mockResolvedValue({
       finding: null,
@@ -57,6 +57,25 @@ describe('LlmExplanationPanel', () => {
 
     await waitFor(() => {
       expect(getByText('Тестовое объяснение')).toBeTruthy()
+      expect(getByText('Проверено')).toBeTruthy()
+    })
+  })
+
+  it('shows the not-verified status when the explanation failed numeric verification', async () => {
+    loadPosition()
+    mockExplainPosition.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Резервное объяснение', claims: [] },
+      verified: false,
+      message: null
+    })
+
+    const { getByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Объяснить эту позицию'))
+
+    await waitFor(() => {
+      expect(getByText('Резервное объяснение')).toBeTruthy()
+      expect(getByText('Не удалось проверить численно')).toBeTruthy()
     })
   })
 

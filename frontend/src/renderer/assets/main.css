@@ -336,6 +336,16 @@ code {
   color: #ffb4b4;
   margin-top: 8px;
 }
+.llm-explanation-panel__verified {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.llm-explanation-panel__verified--true {
+  color: #8fd19e;
+}
+.llm-explanation-panel__verified--false {
+  color: #ffb4b4;
+}
 .llm-explanation-panel__message,
 .llm-explanation-panel__summary {
   margin-top: 8px;

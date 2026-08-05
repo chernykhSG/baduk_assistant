@@ -63,7 +63,18 @@ export function LlmExplanationPanel(): JSX.Element {
         <div class="llm-explanation-panel__message">{result.message}</div>
       )}
       {status === 'done' && result?.explanation && (
-        <div class="llm-explanation-panel__summary">{result.explanation.summary}</div>
+        <>
+          <div
+            class={
+              result.verified
+                ? 'llm-explanation-panel__verified llm-explanation-panel__verified--true'
+                : 'llm-explanation-panel__verified llm-explanation-panel__verified--false'
+            }
+          >
+            {result.verified ? 'Проверено' : 'Не удалось проверить численно'}
+          </div>
+          <div class="llm-explanation-panel__summary">{result.explanation.summary}</div>
+        </>
       )}
     </div>
   )
