@@ -4,6 +4,13 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { startBackend, stopBackend, type BackendConnection } from './backendConnection'
 
+// Opt-in Chrome DevTools Protocol access for debugging sessions that have no
+// interactive devtools available (e.g. driven from a terminal). Must be set
+// before app.whenReady().
+if (process.env.BADUK_DEBUG_PORT) {
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.BADUK_DEBUG_PORT)
+}
+
 let backendConnectionPromise: Promise<BackendConnection> | null = null
 
 function getBackendConnection(): Promise<BackendConnection> {
