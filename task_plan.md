@@ -36,8 +36,9 @@
 - [x] Brainstorming frontend-части Фазы 1 — дизайн-спек `docs/superpowers/specs/2026-08-04-phase-1-frontend-design.md` (визуальное сравнение layout + текстовые вопросы: SQLite отложен, renderer владеет IPC напрямую, uPlot, layout-вариант B).
 - [x] Детальный implementation-план frontend-части — `docs/superpowers/plans/2026-08-04-phase-1-frontend.md` (11 задач).
 - [x] Выполнить план frontend-части через `subagent-driven-development` (11 задач + финальное ревью + один fix-wave на 5 из 7 Important-находок).
-- [ ] Смёржить ветку `phase-1-frontend` в `main` через `superpowers:finishing-a-development-branch`.
-- [ ] Ручная сквозная приёмка Фазы 1 целиком с реальным backend+KataGo (drag&drop SGF → дерево+доска → live winrate/ownership по мере прогона) — до сих пор не выполнена ни разу за всю сессию; единственная ручная проверка была для error-состояния ConnectionGate без backend.
+- [x] Смёржить ветку `phase-1-frontend` в `main` через `superpowers:finishing-a-development-branch` (fast-forward `b0107d9..568cfa7`, ветка и SDD-воркспейс удалены, тесты перепроверены на смёрженном `main`).
+- [ ] Запушить `main` в `origin` (сейчас локальный `main` опережает `origin/main` на 23 коммита — backend API-слой + весь frontend Фазы 1 ещё не в GitHub).
+- [ ] Ручная сквозная приёмка Фазы 1 целиком с реальным backend+KataGo (drag&drop SGF → дерево+доска → live winrate/ownership по мере прогона) — до сих пор не выполнена ни разу; единственная ручная проверка была для error-состояния ConnectionGate без backend.
 
 ## Будущие задачи (backlog)
 
