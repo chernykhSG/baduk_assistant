@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import type { JSX } from 'preact'
 import { currentTree, currentNodeId, currentMoveAnalysis } from '../state/appState'
 import { getBoardSize } from '../board/sgfLoader'
@@ -14,6 +14,16 @@ export function LlmExplanationPanel(): JSX.Element {
   const analysis = currentMoveAnalysis.value
   const tree = currentTree.value
   const nodeId = currentNodeId.value
+
+  // Any previously fetched explanation/error is only valid for the position
+  // it was requested for — clear it whenever the current board position
+  // changes so a stale summary can't silently linger under a now-enabled
+  // button that looks current for a different position.
+  useEffect(() => {
+    setStatus('idle')
+    setResult(null)
+    setErrorMessage(null)
+  }, [nodeId])
 
   async function handleExplain(): Promise<void> {
     if (!tree || nodeId === null || !analysis) return
