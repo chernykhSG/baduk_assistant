@@ -58,3 +58,21 @@ class DoneMessage(BaseModel):
 class ErrorMessage(BaseModel):
     type: Literal["error"] = "error"
     detail: str
+
+
+from baduk_backend.feature_extraction.schemas import Finding
+from baduk_backend.llm.schemas import Explanation
+
+
+class ExplainRequest(BaseModel):
+    moves: list[list[str]] = Field(default_factory=list)
+    boardXSize: int = Field(ge=2, le=25)
+    boardYSize: int = Field(ge=2, le=25)
+    analysis: AnalyzeResponse
+
+
+class ExplainResponse(BaseModel):
+    finding: Finding | None = None
+    explanation: Explanation | None = None
+    verified: bool | None = None
+    message: str | None = None

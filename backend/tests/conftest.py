@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from baduk_backend.engine_manager import EngineManager
+from baduk_backend.llm.schemas import Claim, Explanation
 from baduk_backend.main import app
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -62,3 +63,27 @@ def slow_fake_engine_app():
         manager.stop()
         del app.state.engine_manager
         del app.state.engine_lock
+
+
+class _StubLLMProvider:
+    def complete(self, finding, analysis, corrections=None):
+        return Explanation(
+            summary="Тестовое объяснение",
+            claims=[
+                Claim(
+                    text="...",
+                    finding_id=finding.finding_id,
+                    cited_field="weak_score",
+                    cited_number=finding.weak_score,
+                )
+            ],
+        )
+
+
+@pytest.fixture
+def explain_client():
+    app.state.llm_provider = _StubLLMProvider()
+    try:
+        yield TestClient(app)
+    finally:
+        del app.state.llm_provider
