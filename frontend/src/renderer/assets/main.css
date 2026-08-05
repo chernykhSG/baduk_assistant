@@ -217,11 +217,33 @@ code {
   min-height: 0;
   min-width: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
 }
 .board-view--empty {
+  align-items: center;
+  justify-content: center;
   color: var(--ev-c-text-2, #888);
+}
+.board-view__toolbar {
+  display: flex;
+  gap: 16px;
+  padding: 6px 8px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.board-view__toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.board-view__goban {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .variation-tree {

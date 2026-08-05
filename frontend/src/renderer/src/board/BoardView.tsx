@@ -89,21 +89,19 @@ function pvToLines(
 export function BoardView() {
   const [hoveredVertex, setHoveredVertex] = useState<[number, number] | null>(null)
   const [containerRef, containerSize] = useContainerSize()
+  const [showOwnership, setShowOwnership] = useState(true)
+  const [showPv, setShowPv] = useState(true)
   const position = currentBoardPosition.value
   const analysis = currentMoveAnalysis.value
 
   if (!position) {
-    return (
-      <div class="board-view board-view--empty" ref={containerRef}>
-        Откройте SGF-файл, чтобы начать
-      </div>
-    )
+    return <div class="board-view board-view--empty">Откройте SGF-файл, чтобы начать</div>
   }
 
-  const heatMap = ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex)
+  const heatMap = showOwnership ? ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex) : undefined
   const markerMap = lastMoveToMarkerMap(position.lastMoveVertex, position.boardSize)
   const topMove = analysis?.moveInfos[0]
-  const lines = pvToLines(topMove?.pv, position.boardSize)
+  const lines = showPv ? pvToLines(topMove?.pv, position.boardSize) : []
 
   // Before the first ResizeObserver callback (or in test environments, where
   // jsdom never performs real layout and none ever fires), fall back to a
@@ -112,17 +110,37 @@ export function BoardView() {
   const maxHeight = containerSize.height || 600
 
   return (
-    <div class="board-view" ref={containerRef}>
-      <BoundedGoban
-        signMap={position.signMap}
-        heatMap={heatMap}
-        markerMap={markerMap}
-        lines={lines}
-        maxWidth={maxWidth}
-        maxHeight={maxHeight}
-        onVertexPointerEnter={(_event, vertex) => setHoveredVertex(vertex as [number, number])}
-        onVertexPointerLeave={() => setHoveredVertex(null)}
-      />
+    <div class="board-view">
+      <div class="board-view__toolbar">
+        <label>
+          <input
+            type="checkbox"
+            checked={showOwnership}
+            onChange={(event) => setShowOwnership((event.target as HTMLInputElement).checked)}
+          />
+          Владение (heatmap)
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={showPv}
+            onChange={(event) => setShowPv((event.target as HTMLInputElement).checked)}
+          />
+          Предлагаемые ходы
+        </label>
+      </div>
+      <div class="board-view__goban" ref={containerRef}>
+        <BoundedGoban
+          signMap={position.signMap}
+          heatMap={heatMap}
+          markerMap={markerMap}
+          lines={lines}
+          maxWidth={maxWidth}
+          maxHeight={maxHeight}
+          onVertexPointerEnter={(_event, vertex) => setHoveredVertex(vertex as [number, number])}
+          onVertexPointerLeave={() => setHoveredVertex(null)}
+        />
+      </div>
     </div>
   )
 }
