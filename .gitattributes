@@ -1,0 +1,6 @@
+# Normalize line endings to LF in the repository regardless of the checkout
+# machine's core.autocrlf setting - this repo is checked out on Windows
+# (core.autocrlf=true here converts every text file to CRLF on checkout with
+# no .gitattributes to override it), which made ESLint's prettier rule flag
+# nearly every line of every file as a line-ending diff.
+* text=auto eol=lf
