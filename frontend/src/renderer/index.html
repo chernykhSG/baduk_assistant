@@ -4,9 +4,12 @@
     <meta charset="UTF-8" />
     <title>Electron</title>
     <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <!-- connect-src allows the backend sidecar: it's spawned by this app on a
+         fresh loopback port each launch and gated by its own bearer token,
+         so any 127.0.0.1 port is the right trust boundary, not a fixed one. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*"
     />
 
     <link href="./assets/main.css" type="text/css" rel="stylesheet" />
