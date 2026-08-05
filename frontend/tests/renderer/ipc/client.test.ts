@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { analyzePosition, streamAnalysis } from '@renderer/ipc/client'
+import { analyzePosition, streamAnalysis, explainPosition } from '@renderer/ipc/client'
 
 function fakeAnalyzeRequest() {
   return {
@@ -148,5 +148,54 @@ describe('streamAnalysis', () => {
     await vi.waitUntil(() => createdSocket !== undefined)
     close()
     expect(createdSocket!.closed).toBe(true)
+  })
+})
+
+function fakeAnalysisResult() {
+  return {
+    id: 'x',
+    moveInfos: [],
+    rootInfo: { winrate: 0.5, scoreLead: 0, visits: 1 }
+  }
+}
+
+describe('explainPosition', () => {
+  it('POSTs to /api/explain with the auth header and returns the parsed response', async () => {
+    const fakeResponse = {
+      finding: null,
+      explanation: null,
+      verified: null,
+      message: 'Ничего заметного не найдено в этой позиции'
+    }
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => fakeResponse }) as any
+
+    const result = await explainPosition({
+      moves: [],
+      boardXSize: 9,
+      boardYSize: 9,
+      analysis: fakeAnalysisResult()
+    })
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://127.0.0.1:5555/api/explain',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'X-Auth-Token': 'test-token' })
+      })
+    )
+    expect(result).toEqual(fakeResponse)
+  })
+
+  it('throws with the response detail when the request fails', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      json: async () => ({ detail: 'claude api error' })
+    }) as any
+
+    await expect(
+      explainPosition({ moves: [], boardXSize: 9, boardYSize: 9, analysis: fakeAnalysisResult() })
+    ).rejects.toThrow('claude api error')
   })
 })

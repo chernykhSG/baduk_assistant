@@ -136,3 +136,63 @@ export function streamAnalysis(
     ws?.close()
   }
 }
+
+export interface Finding {
+  finding_id: string
+  type: 'weak_group'
+  turn_number: number
+  stones: [number, number][]
+  weak_score: number
+  own_certainty: number
+  boundary_certainty: number
+  liberties: number
+  severity: 'low' | 'medium' | 'high'
+  confidence: number
+}
+
+export interface Claim {
+  text: string
+  finding_id: string
+  cited_field:
+    | 'weak_score'
+    | 'own_certainty'
+    | 'boundary_certainty'
+    | 'liberties'
+    | 'visits'
+    | 'winrate'
+    | 'scoreLead'
+  cited_number: number
+}
+
+export interface Explanation {
+  summary: string
+  claims: Claim[]
+}
+
+export interface ExplainRequest {
+  moves: [string, string][]
+  boardXSize: number
+  boardYSize: number
+  analysis: AnalyzeResponse
+}
+
+export interface ExplainResponse {
+  finding: Finding | null
+  explanation: Explanation | null
+  verified: boolean | null
+  message: string | null
+}
+
+export async function explainPosition(request: ExplainRequest): Promise<ExplainResponse> {
+  const { port, token } = await getConnection()
+  const response = await fetch(`http://127.0.0.1:${port}/api/explain`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+    body: JSON.stringify(request)
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ detail: response.statusText }))
+    throw new Error(`explainPosition failed (${response.status}): ${body.detail ?? response.statusText}`)
+  }
+  return response.json()
+}
