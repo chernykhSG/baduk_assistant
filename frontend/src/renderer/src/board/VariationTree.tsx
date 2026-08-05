@@ -23,39 +23,37 @@ function stepUp() {
   }
 }
 
-function handleKeyDown(event: KeyboardEvent) {
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    stepDown()
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    stepUp()
-  }
-}
-
 export function VariationTree() {
   const tree = currentTree.value
   const nodeId = currentNodeId.value
   const currentRef = useRef<HTMLButtonElement | null>(null)
-  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     currentRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [nodeId])
 
-  // Focus the tree as soon as a game loads (a new tree object), so
-  // arrow-key navigation works immediately instead of requiring a click first.
+  // Global, not scoped to a focused element: previously this required
+  // clicking into the tree first, and lost effect again as soon as focus
+  // moved anywhere else (e.g. the board's ownership/PV checkboxes).
   useEffect(() => {
-    containerRef.current?.focus()
-  }, [tree])
+    function handleKeyDown(event: KeyboardEvent): void {
+      const tag = (event.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        stepDown()
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        stepUp()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
-  if (!tree) return <div class="variation-tree" ref={containerRef} />
+  if (!tree) return <div class="variation-tree" />
 
-  return (
-    <div class="variation-tree" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown}>
-      {renderChain(tree.root)}
-    </div>
-  )
+  return <div class="variation-tree">{renderChain(tree.root)}</div>
 
   function renderMarker(node: NodeObject) {
     const isCurrent = node.id === nodeId

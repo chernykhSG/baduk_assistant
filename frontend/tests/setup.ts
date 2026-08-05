@@ -1,3 +1,17 @@
+import { afterEach } from 'vitest'
+import { cleanup } from '@testing-library/preact'
+
+// @testing-library/preact's own auto-cleanup only registers itself against a
+// *global* afterEach (i.e. requires vitest's `globals: true`, which this
+// project doesn't enable — test files import afterEach explicitly instead).
+// Without this, components from a previous test are never unmounted, so
+// their effects' cleanup functions (removing event listeners, etc.) never
+// run — e.g. VariationTree's window-level keydown listener accumulated
+// across every prior test, firing once per leaked instance.
+afterEach(() => {
+  cleanup()
+})
+
 // jsdom does not implement window.matchMedia, which uplot calls at module-load
 // time (to detect device pixel ratio changes). Polyfill it so importing uplot
 // inside the test environment does not throw.

@@ -280,7 +280,10 @@ code {
 }
 .variation-tree__marker--black {
   background: #111;
-  border-color: #000;
+  /* A near-black border against this dark theme's #1b1b1f background made
+     black-stone nodes essentially invisible; a lighter gray rim keeps the
+     circle visible without changing the fill color. */
+  border-color: #6b6b6b;
 }
 .variation-tree__marker--white {
   background: #eee;
