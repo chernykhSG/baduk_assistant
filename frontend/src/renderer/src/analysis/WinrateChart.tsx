@@ -4,6 +4,13 @@ import 'uplot/dist/uPlot.min.css'
 import { effect } from '@preact/signals'
 import { analysisByTurn, currentNodeId } from '../state/appState'
 
+// uPlot draws axis tick labels and axis titles on <canvas>, so they're
+// invisible to CSS entirely — the default `stroke` is a dark gray meant for
+// a light page background, which on this app's dark theme was nearly
+// indistinguishable from the background behind it.
+const AXIS_TEXT_COLOR = '#c6c9d1'
+const AXIS_GRID_COLOR = 'rgba(198, 201, 209, 0.15)'
+
 export function WinrateChart() {
   const containerRef = useRef<HTMLDivElement>(null)
   const plotRef = useRef<uPlot | null>(null)
@@ -29,7 +36,11 @@ export function WinrateChart() {
           y: { range: [0, 100] },
           score: {},
         },
-        axes: [{ label: 'Ход' }, { scale: 'y', label: 'Winrate %' }, { scale: 'score', side: 1, label: 'Score lead' }],
+        axes: [
+          { label: 'Ход', stroke: AXIS_TEXT_COLOR, grid: { stroke: AXIS_GRID_COLOR } },
+          { scale: 'y', label: 'Winrate %', stroke: AXIS_TEXT_COLOR, grid: { stroke: AXIS_GRID_COLOR } },
+          { scale: 'score', side: 1, label: 'Score lead', stroke: AXIS_TEXT_COLOR, grid: { show: false } },
+        ],
       },
       [[], [], []],
       container
