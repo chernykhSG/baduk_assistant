@@ -96,7 +96,7 @@ frontend/src/renderer/assets/main.css                       # MODIFY — сти�
 - Test: `backend/tests/board/test_groups.py`
 
 **Interfaces:**
-- Produces: `Group` (dataclass: `color: str`, `stones: list[tuple[int, int]]`, `liberties: int`); `find_groups(board: list[list[str | None]]) -> list[Group]`; `find_group_at(board: list[list[str | None]], x: int, y: int) -> Group | None`. Доска — `board[y][x]`, значения `"B"`/`"W"`/`None`, координаты — `(x, y)`.
+- Produces: `Group` (dataclass: `color: str`, `stones: list[tuple[int, int]]`, `liberties: int`); `find_groups(board: list[list[str | None]]) -> list[Group]`; `find_group_at(board: list[list[str | None]], x: int, y: int) -> Group | None`; `neighbors(x: int, y: int, board_x_size: int, board_y_size: int) -> list[tuple[int, int]]` (публичная — переиспользуется в Task 2, не дублировать). Доска — `board[y][x]`, значения `"B"`/`"W"`/`None`, координаты — `(x, y)`.
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -209,7 +209,7 @@ def find_group_at(board: list[list[str | None]], x: int, y: int) -> Group | None
     return Group(color=color, stones=sorted(stones), liberties=len(liberty_points))
 
 
-def _neighbors(x: int, y: int, board_x_size: int, board_y_size: int) -> list[tuple[int, int]]:
+def neighbors(x: int, y: int, board_x_size: int, board_y_size: int) -> list[tuple[int, int]]:
     candidates = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
     return [(nx, ny) for nx, ny in candidates if 0 <= nx < board_x_size and 0 <= ny < board_y_size]
 
@@ -227,7 +227,7 @@ def _flood_fill(
     stack = [(x, y)]
     while stack:
         cx, cy = stack.pop()
-        for nx, ny in _neighbors(cx, cy, board_x_size, board_y_size):
+        for nx, ny in neighbors(cx, cy, board_x_size, board_y_size):
             neighbor = board[ny][nx]
             if neighbor is None:
                 liberty_points.add((nx, ny))
@@ -259,7 +259,7 @@ git commit -m "feat: union-find grouping and liberties for board positions"
 - Test: `backend/tests/board/test_board_state.py`
 
 **Interfaces:**
-- Consumes: `Group`, `find_group_at` из Task 1 (`backend/src/baduk_backend/board/groups.py`).
+- Consumes: `Group`, `find_group_at`, `neighbors` из Task 1 (`backend/src/baduk_backend/board/groups.py`).
 - Produces: `gtp_to_xy(coord: str, board_size: int) -> tuple[int, int] | None` (координата GTP как `"Q4"`/`"pass"` в индексы сетки, `None` для `"pass"`; та же схема колонок, что во frontend `gtpColumns.ts` — `"ABCDEFGHJKLMNOPQRSTUVWXYZ"`, без `I`); `apply_moves(moves: list[list[str]], board_x_size: int, board_y_size: int) -> list[list[str | None]]`.
 
 - [ ] **Step 1: Написать падающий тест**
@@ -328,7 +328,7 @@ def gtp_to_xy(coord: str, board_size: int) -> tuple[int, int] | None:
 
 ```python
 # backend/src/baduk_backend/board/board_state.py
-from baduk_backend.board.groups import find_group_at
+from baduk_backend.board.groups import find_group_at, neighbors
 from baduk_backend.board.gtp_coords import gtp_to_xy
 
 
@@ -345,18 +345,13 @@ def apply_moves(moves: list[list[str]], board_x_size: int, board_y_size: int) ->
         x, y = vertex
         board[y][x] = color
         opponent = "W" if color == "B" else "B"
-        for nx, ny in _neighbors(x, y, board_x_size, board_y_size):
+        for nx, ny in neighbors(x, y, board_x_size, board_y_size):
             if board[ny][nx] == opponent:
                 group = find_group_at(board, nx, ny)
                 if group is not None and group.liberties == 0:
                     for gx, gy in group.stones:
                         board[gy][gx] = None
     return board
-
-
-def _neighbors(x: int, y: int, board_x_size: int, board_y_size: int) -> list[tuple[int, int]]:
-    candidates = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
-    return [(nx, ny) for nx, ny in candidates if 0 <= nx < board_x_size and 0 <= ny < board_y_size]
 ```
 
 - [ ] **Step 4: Убедиться, что тест проходит**
