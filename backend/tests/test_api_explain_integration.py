@@ -19,6 +19,7 @@ def test_explain_with_real_claude_api():
         type="weak_group",
         turn_number=10,
         stones=[(4, 4)],
+        color="B",
         weak_score=0.85,
         own_certainty=0.1,
         boundary_certainty=0.2,
@@ -33,7 +34,7 @@ def test_explain_with_real_claude_api():
         ownership=[0.1] * 81,
     )
 
-    explanation = provider.complete(finding, analysis)
+    explanation = provider.complete(finding, analysis, board_size=9)
 
     assert explanation.summary
     assert len(explanation.claims) > 0

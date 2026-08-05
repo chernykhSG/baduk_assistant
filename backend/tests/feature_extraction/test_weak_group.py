@@ -29,6 +29,7 @@ def test_detect_weak_group_computes_expected_score_and_confidence():
     assert finding.type == "weak_group"
     assert finding.turn_number == 12
     assert finding.stones == [(4, 4)]
+    assert finding.color == "B"
     assert finding.own_certainty == pytest.approx(0.0)
     assert finding.boundary_certainty == pytest.approx(0.0)
     assert finding.liberties == 4

@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from baduk_backend.api.schemas import ExplainRequest, ExplainResponse
@@ -35,7 +37,9 @@ async def explain(
     # itself failed (network/timeout/auth), which the design spec treats as a
     # 503, the same way /api/analyze does for KataGo engine failures.
     try:
-        explanation, verified = verify_and_retry(provider, finding, body.analysis)
+        explanation, verified = await asyncio.to_thread(
+            verify_and_retry, provider, finding, body.analysis, body.boardXSize
+        )
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return ExplainResponse(finding=finding, explanation=explanation, verified=verified)

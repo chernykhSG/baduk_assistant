@@ -1,6 +1,9 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from baduk_backend.feature_extraction.schemas import Finding
+from baduk_backend.llm.schemas import Explanation
 
 
 class MoveInfo(BaseModel):
@@ -60,15 +63,21 @@ class ErrorMessage(BaseModel):
     detail: str
 
 
-from baduk_backend.feature_extraction.schemas import Finding
-from baduk_backend.llm.schemas import Explanation
-
-
 class ExplainRequest(BaseModel):
     moves: list[list[str]] = Field(default_factory=list)
     boardXSize: int = Field(ge=2, le=25)
     boardYSize: int = Field(ge=2, le=25)
     analysis: AnalyzeResponse
+
+    @model_validator(mode="after")
+    def _ownership_matches_board_size(self) -> "ExplainRequest":
+        ownership = self.analysis.ownership
+        if ownership is not None and len(ownership) != self.boardXSize * self.boardYSize:
+            raise ValueError(
+                "analysis.ownership length must equal boardXSize * boardYSize "
+                f"({self.boardXSize * self.boardYSize}), got {len(ownership)}"
+            )
+        return self
 
 
 class ExplainResponse(BaseModel):

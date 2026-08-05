@@ -66,7 +66,7 @@ def slow_fake_engine_app():
 
 
 class _StubLLMProvider:
-    def complete(self, finding, analysis, corrections=None):
+    def complete(self, finding, analysis, board_size, corrections=None):
         return Explanation(
             summary="Тестовое объяснение",
             claims=[

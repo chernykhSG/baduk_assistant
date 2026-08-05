@@ -8,6 +8,7 @@ class Finding(BaseModel):
     type: Literal["weak_group"]
     turn_number: int
     stones: list[tuple[int, int]]
+    color: Literal["B", "W"]
     weak_score: float
     own_certainty: float
     boundary_certainty: float

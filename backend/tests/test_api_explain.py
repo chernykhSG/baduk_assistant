@@ -44,13 +44,22 @@ def test_explain_without_token_returns_401(explain_client):
     assert response.status_code == 401
 
 
+def test_explain_returns_422_when_ownership_length_mismatches_board_size(explain_client):
+    response = explain_client.post(
+        "/api/explain",
+        headers={"X-Auth-Token": AUTH_TOKEN},
+        json=_payload(ownership=[0.0] * 80),
+    )
+    assert response.status_code == 422
+
+
 def test_explain_returns_503_when_llm_provider_fails():
     from fastapi.testclient import TestClient
 
     from baduk_backend.main import app
 
     class _FailingProvider:
-        def complete(self, finding, analysis, corrections=None):
+        def complete(self, finding, analysis, board_size, corrections=None):
             raise RuntimeError("claude api unavailable")
 
     app.state.llm_provider = _FailingProvider()

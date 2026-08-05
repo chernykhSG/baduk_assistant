@@ -115,6 +115,7 @@ def detect_weak_group(
         type="weak_group",
         turn_number=turn_number,
         stones=group.stones,
+        color=group.color,
         weak_score=score,
         own_certainty=own_cert,
         boundary_certainty=boundary_cert,

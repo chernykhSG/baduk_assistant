@@ -35,6 +35,7 @@ def _finding() -> Finding:
         type="weak_group",
         turn_number=1,
         stones=[(0, 0)],
+        color="B",
         weak_score=0.85,
         own_certainty=0.1,
         boundary_certainty=0.1,
@@ -58,7 +59,7 @@ def test_claude_provider_parses_tool_use_response_into_explanation():
     client = _FakeClient(response)
     provider = ClaudeProvider(client=client, model="claude-test")
 
-    explanation = provider.complete(_finding(), _analysis())
+    explanation = provider.complete(_finding(), _analysis(), board_size=9)
 
     assert explanation.summary == "Слабая группа найдена."
     assert explanation.claims[0].cited_field == "weak_score"
@@ -66,12 +67,59 @@ def test_claude_provider_parses_tool_use_response_into_explanation():
     assert client.messages.calls[0]["model"] == "claude-test"
 
 
+def test_claude_provider_sets_max_tokens_and_disables_thinking():
+    response = _tool_use_response("ok", [])
+    client = _FakeClient(response)
+    provider = ClaudeProvider(client=client, model="claude-test")
+
+    provider.complete(_finding(), _analysis(), board_size=9)
+
+    call = client.messages.calls[0]
+    assert call["max_tokens"] == 4096
+    assert call["thinking"] == {"type": "disabled"}
+
+
+def test_claude_provider_prompt_uses_gtp_coords_and_color_not_raw_json():
+    response = _tool_use_response("ok", [])
+    client = _FakeClient(response)
+    provider = ClaudeProvider(client=client, model="claude-test")
+
+    provider.complete(_finding(), _analysis(), board_size=9)
+
+    sent_content = client.messages.calls[0]["messages"][0]["content"]
+    # stones=[(0, 0)] on a 9x9 board is GTP "A9" - a human-readable
+    # coordinate, not the raw grid-index tuple [0, 0] that model_dump_json()
+    # would have produced.
+    assert "A9" in sent_content
+    assert "[0, 0]" not in sent_content
+    assert "чёрных" in sent_content
+    assert "f_1" in sent_content
+    assert "0.85" in sent_content  # weak_score
+    assert "2" in sent_content  # liberties
+
+
+def test_claude_provider_client_uses_60s_timeout(monkeypatch):
+    captured: dict = {}
+
+    class _FakeAnthropic:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr("anthropic.Anthropic", _FakeAnthropic)
+    monkeypatch.setenv("BADUK_CLAUDE_API_KEY", "test-key")
+
+    ClaudeProvider()
+
+    assert captured["timeout"] == 60.0
+    assert captured["api_key"] == "test-key"
+
+
 def test_claude_provider_appends_corrections_to_prompt():
     response = _tool_use_response("ok", [])
     client = _FakeClient(response)
     provider = ClaudeProvider(client=client, model="claude-test")
 
-    provider.complete(_finding(), _analysis(), corrections=["ты ошибся про X"])
+    provider.complete(_finding(), _analysis(), board_size=9, corrections=["ты ошибся про X"])
 
     sent_content = client.messages.calls[0]["messages"][0]["content"]
     assert "ты ошибся про X" in sent_content
@@ -83,4 +131,4 @@ def test_claude_provider_raises_if_tool_not_called():
     provider = ClaudeProvider(client=client, model="claude-test")
 
     with pytest.raises(RuntimeError, match="did not call"):
-        provider.complete(_finding(), _analysis())
+        provider.complete(_finding(), _analysis(), board_size=9)

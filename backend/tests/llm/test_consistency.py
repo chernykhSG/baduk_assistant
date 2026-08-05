@@ -9,7 +9,7 @@ class _RecordingFakeProvider:
         self._responses = list(responses)
         self.calls: list[list[str] | None] = []
 
-    def complete(self, finding, analysis, corrections=None):
+    def complete(self, finding, analysis, board_size, corrections=None):
         self.calls.append(corrections)
         return self._responses.pop(0)
 
@@ -20,6 +20,7 @@ def _finding() -> Finding:
         type="weak_group",
         turn_number=5,
         stones=[(4, 4)],
+        color="B",
         weak_score=0.85,
         own_certainty=0.0,
         boundary_certainty=0.0,
@@ -45,7 +46,7 @@ def test_verify_and_retry_accepts_correct_claims_on_first_try():
     )
     provider = _RecordingFakeProvider([explanation])
 
-    result, verified = verify_and_retry(provider, _finding(), _analysis())
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
 
     assert verified is True
     assert result == explanation
@@ -63,7 +64,7 @@ def test_verify_and_retry_retries_once_then_succeeds():
     )
     provider = _RecordingFakeProvider([bad, good])
 
-    result, verified = verify_and_retry(provider, _finding(), _analysis())
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
 
     assert verified is True
     assert result == good
@@ -79,7 +80,7 @@ def test_verify_and_retry_falls_back_after_exhausting_retries():
     )
     provider = _RecordingFakeProvider([bad, bad, bad])
 
-    result, verified = verify_and_retry(provider, _finding(), _analysis())
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
 
     assert verified is False
     assert result.claims == []
@@ -93,6 +94,52 @@ def test_verify_and_retry_checks_claims_against_rootinfo_fields():
     )
     provider = _RecordingFakeProvider([explanation])
 
-    result, verified = verify_and_retry(provider, _finding(), _analysis())
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
 
     assert verified is True
+
+
+def test_verify_and_retry_rejects_claim_with_wrong_finding_id():
+    wrong_id = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_other", cited_field="weak_score", cited_number=0.85)],
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+    )
+    provider = _RecordingFakeProvider([wrong_id, good])
+
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert provider.calls[0] is None
+    assert provider.calls[1] is not None
+    assert "finding_id" in provider.calls[1][0]
+
+
+def test_verify_and_retry_rejects_empty_claims_list():
+    empty = Explanation(summary="...", claims=[])
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+    )
+    provider = _RecordingFakeProvider([empty, good])
+
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert provider.calls[0] is None
+    assert provider.calls[1] is not None
+
+
+def test_verify_and_retry_falls_back_when_claims_stay_empty_after_retries():
+    empty = Explanation(summary="...", claims=[])
+    provider = _RecordingFakeProvider([empty, empty, empty])
+
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    assert verified is False
+    assert result.claims == []

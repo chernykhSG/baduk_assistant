@@ -10,5 +10,6 @@ class LLMProvider(Protocol):
         self,
         finding: Finding,
         analysis: AnalyzeResponse,
+        board_size: int,
         corrections: list[str] | None = None,
     ) -> Explanation: ...

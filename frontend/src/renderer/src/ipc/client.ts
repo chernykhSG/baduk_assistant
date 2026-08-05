@@ -142,6 +142,7 @@ export interface Finding {
   type: 'weak_group'
   turn_number: number
   stones: [number, number][]
+  color: 'B' | 'W'
   weak_score: number
   own_certainty: number
   boundary_certainty: number
@@ -192,7 +193,9 @@ export async function explainPosition(request: ExplainRequest): Promise<ExplainR
   })
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: response.statusText }))
-    throw new Error(`explainPosition failed (${response.status}): ${body.detail ?? response.statusText}`)
+    throw new Error(
+      `explainPosition failed (${response.status}): ${body.detail ?? response.statusText}`
+    )
   }
   return response.json()
 }
