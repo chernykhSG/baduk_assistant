@@ -51,9 +51,19 @@ export function VariationTree() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  function handleWheel(event: WheelEvent): void {
+    event.preventDefault()
+    if (event.deltaY > 0) stepDown()
+    else if (event.deltaY < 0) stepUp()
+  }
+
   if (!tree) return <div class="variation-tree" />
 
-  return <div class="variation-tree">{renderChain(tree.root)}</div>
+  return (
+    <div class="variation-tree" onWheel={handleWheel}>
+      {renderChain(tree.root)}
+    </div>
+  )
 
   function renderMarker(node: NodeObject) {
     const isCurrent = node.id === nodeId
