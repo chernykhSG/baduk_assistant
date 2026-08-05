@@ -10,10 +10,11 @@ export function WinrateChart() {
 
   useEffect(() => {
     if (!containerRef.current) return
+    const container = containerRef.current
 
     plotRef.current = new uPlot(
       {
-        width: containerRef.current.clientWidth || 600,
+        width: container.clientWidth || 600,
         height: 160,
         series: [
           {},
@@ -27,7 +28,7 @@ export function WinrateChart() {
         axes: [{}, { scale: 'y', label: 'Winrate %' }, { scale: 'score', side: 1, label: 'Score lead' }],
       },
       [[], [], []],
-      containerRef.current
+      container
     )
 
     const stopEffect = effect(() => {
@@ -38,7 +39,25 @@ export function WinrateChart() {
       plotRef.current?.setData([xs, winrates, scoreLeads])
     })
 
+    // uPlot's canvas is a fixed pixel size set once at construction — it
+    // never tracks its container on its own, so maximizing/resizing the
+    // window left the chart pinned at its original width. Re-applies the
+    // container's current width on resize (rounded, and skipped when
+    // unchanged, to avoid the same kind of ResizeObserver feedback loop
+    // fixed in BoardView).
+    let lastWidth = container.clientWidth
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const width = Math.round(entry.contentRect.width)
+      if (width === 0 || width === lastWidth) return
+      lastWidth = width
+      plotRef.current?.setSize({ width, height: 160 })
+    })
+    resizeObserver.observe(container)
+
     return () => {
+      resizeObserver.disconnect()
       stopEffect()
       plotRef.current?.destroy()
     }
