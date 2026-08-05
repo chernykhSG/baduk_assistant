@@ -303,3 +303,41 @@ code {
 .winrate-chart {
   padding: 4px 8px;
 }
+
+.analysis-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.analysis-panel__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  flex-shrink: 0;
+}
+.analysis-panel__tab {
+  background: none;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--ev-c-text-2, #888);
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.analysis-panel__tab--active {
+  color: var(--ev-c-text-1, #fff);
+  border-color: var(--ev-c-text-2, #888);
+}
+.llm-explanation-panel {
+  padding: 8px;
+  font-size: 13px;
+}
+.llm-explanation-panel__error {
+  color: #ffb4b4;
+  margin-top: 8px;
+}
+.llm-explanation-panel__message,
+.llm-explanation-panel__summary {
+  margin-top: 8px;
+  white-space: pre-wrap;
+}

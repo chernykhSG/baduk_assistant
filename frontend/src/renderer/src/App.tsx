@@ -3,7 +3,7 @@ import { signal } from '@preact/signals'
 import type { JSX } from 'preact'
 import { BoardView } from './board/BoardView'
 import { VariationTree } from './board/VariationTree'
-import { WinrateChart } from './analysis/WinrateChart'
+import { AnalysisPanel } from './analysis/AnalysisPanel'
 import { parseSgf, getBoardSize, mainLineNodeIds, SgfParseError } from './board/sgfLoader'
 import { buildStreamRequest } from './board/gameRequestBuilder'
 import { streamAnalysis } from './ipc/client'
@@ -127,7 +127,7 @@ export function App(): JSX.Element {
         </div>
       </div>
       <div class="app-shell__chart">
-        <WinrateChart />
+        <AnalysisPanel />
       </div>
     </div>
   )

@@ -26,7 +26,7 @@ function extractKomi(tree: GameTree): number {
   return Number.isFinite(parsed) ? parsed : 7.5
 }
 
-function gtpMoves(tree: GameTree, nodeId: number, boardSize: number): [string, string][] {
+export function gtpMoves(tree: GameTree, nodeId: number, boardSize: number): [string, string][] {
   return movesFromRootToNode(tree, nodeId).map(({ color, sgfCoord }) => [
     color,
     sgfCoordToGtp(sgfCoord, boardSize)
