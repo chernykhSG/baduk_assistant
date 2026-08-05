@@ -27,7 +27,7 @@ export function WinrateChart(): JSX.Element {
         series: [
           { label: 'Ход' },
           { label: 'Winrate (B), %', stroke: '#4c9aff', width: 2 },
-          { label: 'Score lead', stroke: '#ff6b6b', width: 2, dash: [6, 4], scale: 'score' },
+          { label: 'Score lead', stroke: '#ff6b6b', width: 2, dash: [6, 4], scale: 'score' }
         ],
         scales: {
           // uPlot treats the x scale as Unix-time-in-seconds by default, so
@@ -35,13 +35,24 @@ export function WinrateChart(): JSX.Element {
           // the epoch ("1/1/70 5:00am") with an axis labeled "Time".
           x: { time: false },
           y: { range: [0, 100] },
-          score: {},
+          score: {}
         },
         axes: [
           { label: 'Ход', stroke: AXIS_TEXT_COLOR, grid: { stroke: AXIS_GRID_COLOR } },
-          { scale: 'y', label: 'Winrate %', stroke: AXIS_TEXT_COLOR, grid: { stroke: AXIS_GRID_COLOR } },
-          { scale: 'score', side: 1, label: 'Score lead', stroke: AXIS_TEXT_COLOR, grid: { show: false } },
-        ],
+          {
+            scale: 'y',
+            label: 'Winrate %',
+            stroke: AXIS_TEXT_COLOR,
+            grid: { stroke: AXIS_GRID_COLOR }
+          },
+          {
+            scale: 'score',
+            side: 1,
+            label: 'Score lead',
+            stroke: AXIS_TEXT_COLOR,
+            grid: { show: false }
+          }
+        ]
       },
       [[], [], []],
       container
@@ -68,7 +79,7 @@ export function WinrateChart(): JSX.Element {
       if (index !== -1) {
         plot.setCursor({
           left: plot.valToPos(xs[index], 'x'),
-          top: plot.valToPos(winrates[index], 'y'),
+          top: plot.valToPos(winrates[index], 'y')
         })
         plot.setLegend({ idx: index })
       }

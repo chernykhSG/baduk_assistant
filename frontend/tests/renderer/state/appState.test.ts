@@ -6,7 +6,7 @@ import {
   analysisByTurn,
   currentBoardPosition,
   currentTurnNumber,
-  currentMoveAnalysis,
+  currentMoveAnalysis
 } from '@renderer/state/appState'
 
 const fixtureContent = '(;GM[1]FF[4]SZ[9]KM[7.5]RU[Chinese];B[ee])'
@@ -43,7 +43,11 @@ describe('currentTurnNumber + currentMoveAnalysis', () => {
     expect(currentTurnNumber.value).toBe(1)
     expect(currentMoveAnalysis.value).toBeNull()
 
-    const fakeResponse = { id: 'x', moveInfos: [], rootInfo: { winrate: 0.6, scoreLead: 1, visits: 10 } }
+    const fakeResponse = {
+      id: 'x',
+      moveInfos: [],
+      rootInfo: { winrate: 0.6, scoreLead: 1, visits: 10 }
+    }
     analysisByTurn.value = new Map([[leaf.id, fakeResponse]])
 
     expect(currentMoveAnalysis.value).toEqual(fakeResponse)
@@ -59,7 +63,11 @@ describe('currentTurnNumber + currentMoveAnalysis', () => {
 
     currentTree.value = tree
 
-    const fakeResponse = { id: 'x', moveInfos: [], rootInfo: { winrate: 0.6, scoreLead: 1, visits: 10 } }
+    const fakeResponse = {
+      id: 'x',
+      moveInfos: [],
+      rootInfo: { winrate: 0.6, scoreLead: 1, visits: 10 }
+    }
     // Only the main-line node at this depth was ever analyzed (as buildStreamRequest only streams the main line).
     analysisByTurn.value = new Map([[mainLineVariation.id, fakeResponse]])
 

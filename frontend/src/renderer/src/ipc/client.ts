@@ -43,7 +43,12 @@ export interface StreamAnalyzeRequest {
   includeOwnership: boolean
 }
 
-export type ProgressMessage = { type: 'progress'; turnNumber: number; total: number; result: AnalyzeResponse }
+export type ProgressMessage = {
+  type: 'progress'
+  turnNumber: number
+  total: number
+  result: AnalyzeResponse
+}
 export type DoneMessage = { type: 'done' }
 export type ErrorMessage = { type: 'error'; detail: string }
 
@@ -67,11 +72,13 @@ export async function analyzePosition(request: AnalyzeRequest): Promise<AnalyzeR
   const response = await fetch(`http://127.0.0.1:${port}/api/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
-    body: JSON.stringify(request),
+    body: JSON.stringify(request)
   })
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: response.statusText }))
-    throw new Error(`analyzePosition failed (${response.status}): ${body.detail ?? response.statusText}`)
+    throw new Error(
+      `analyzePosition failed (${response.status}): ${body.detail ?? response.statusText}`
+    )
   }
   return response.json()
 }
@@ -93,7 +100,9 @@ export function streamAnalysis(
 
   getConnection().then(({ port, token }) => {
     if (closed) return
-    ws = new WebSocket(`ws://127.0.0.1:${port}/api/analyze/stream?token=${encodeURIComponent(token)}`)
+    ws = new WebSocket(
+      `ws://127.0.0.1:${port}/api/analyze/stream?token=${encodeURIComponent(token)}`
+    )
     ws.addEventListener('open', () => {
       ws!.send(JSON.stringify(request))
     })
@@ -115,7 +124,10 @@ export function streamAnalysis(
     ws.addEventListener('close', (event: CloseEvent) => {
       if (finished || closed) return
       finished = true
-      handlers.onError({ type: 'error', detail: `WebSocket closed unexpectedly (code ${event.code})` })
+      handlers.onError({
+        type: 'error',
+        detail: `WebSocket closed unexpectedly (code ${event.code})`
+      })
     })
   })
 

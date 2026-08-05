@@ -8,7 +8,10 @@ import type { MoveInfo } from '../ipc/client'
 
 const MAX_SUGGESTED_MOVES = 5
 
-function useContainerSize(): [(el: HTMLDivElement | null) => void, { width: number; height: number }] {
+function useContainerSize(): [
+  (el: HTMLDivElement | null) => void,
+  { width: number; height: number }
+] {
   const [size, setSize] = useState({ width: 0, height: 0 })
   const sizeRef = useRef(size)
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -108,7 +111,9 @@ export function BoardView(): JSX.Element {
     return <div class="board-view board-view--empty">Откройте SGF-файл, чтобы начать</div>
   }
 
-  const heatMap = showOwnership ? ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex) : undefined
+  const heatMap = showOwnership
+    ? ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex)
+    : undefined
   const markerMap = buildMarkerMap(
     position.lastMoveVertex,
     showPv ? analysis?.moveInfos : undefined,

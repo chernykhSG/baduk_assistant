@@ -10,21 +10,27 @@ function fakeAnalyzeRequest() {
     boardYSize: 19,
     analyzeTurns: [0] as [number],
     maxVisits: 50,
-    includeOwnership: true,
+    includeOwnership: true
   }
 }
 
 beforeEach(() => {
   ;(globalThis as any).window = (globalThis as any).window ?? {}
   ;(window as any).baduk = {
-    getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+    getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' })
   }
 })
 
 describe('analyzePosition', () => {
   it('POSTs to /api/analyze with the auth header and returns the parsed response', async () => {
-    const fakeResponse = { id: 'x', moveInfos: [], rootInfo: { winrate: 0.5, scoreLead: 0, visits: 1 } }
-    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => fakeResponse }) as any
+    const fakeResponse = {
+      id: 'x',
+      moveInfos: [],
+      rootInfo: { winrate: 0.5, scoreLead: 0, visits: 1 }
+    }
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => fakeResponse }) as any
 
     const result = await analyzePosition(fakeAnalyzeRequest())
 
@@ -32,7 +38,7 @@ describe('analyzePosition', () => {
       'http://127.0.0.1:5555/api/analyze',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'X-Auth-Token': 'test-token' }),
+        headers: expect.objectContaining({ 'X-Auth-Token': 'test-token' })
       })
     )
     expect(result).toEqual(fakeResponse)
@@ -43,7 +49,7 @@ describe('analyzePosition', () => {
       ok: false,
       status: 503,
       statusText: 'Service Unavailable',
-      json: async () => ({ detail: 'engine crashed' }),
+      json: async () => ({ detail: 'engine crashed' })
     }) as any
 
     await expect(analyzePosition(fakeAnalyzeRequest())).rejects.toThrow('engine crashed')
@@ -93,7 +99,7 @@ describe('streamAnalysis', () => {
         boardYSize: 19,
         turnNumbers: [0],
         maxVisits: 50,
-        includeOwnership: true,
+        includeOwnership: true
       },
       { onProgress, onDone, onError }
     )
@@ -108,8 +114,8 @@ describe('streamAnalysis', () => {
         type: 'progress',
         turnNumber: 0,
         total: 1,
-        result: { id: 'x', moveInfos: [], rootInfo: { winrate: 0.5, scoreLead: 0, visits: 1 } },
-      }),
+        result: { id: 'x', moveInfos: [], rootInfo: { winrate: 0.5, scoreLead: 0, visits: 1 } }
+      })
     })
     createdSocket!.dispatch('message', { data: JSON.stringify({ type: 'done' }) })
 
@@ -134,7 +140,7 @@ describe('streamAnalysis', () => {
         boardYSize: 19,
         turnNumbers: [0],
         maxVisits: 50,
-        includeOwnership: true,
+        includeOwnership: true
       },
       { onProgress: vi.fn(), onDone: vi.fn(), onError: vi.fn() }
     )

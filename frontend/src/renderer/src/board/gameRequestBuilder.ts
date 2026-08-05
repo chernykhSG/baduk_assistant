@@ -29,7 +29,7 @@ function extractKomi(tree: GameTree): number {
 function gtpMoves(tree: GameTree, nodeId: number, boardSize: number): [string, string][] {
   return movesFromRootToNode(tree, nodeId).map(({ color, sgfCoord }) => [
     color,
-    sgfCoordToGtp(sgfCoord, boardSize),
+    sgfCoordToGtp(sgfCoord, boardSize)
   ])
 }
 
@@ -48,11 +48,14 @@ export function buildAnalyzeRequest(
     boardYSize: boardSize,
     analyzeTurns: [moves.length],
     maxVisits: options.maxVisits,
-    includeOwnership: true,
+    includeOwnership: true
   }
 }
 
-export function buildStreamRequest(tree: GameTree, options: { maxVisits: number }): StreamAnalyzeRequest {
+export function buildStreamRequest(
+  tree: GameTree,
+  options: { maxVisits: number }
+): StreamAnalyzeRequest {
   const boardSize = getBoardSize(tree)
   const leaf = findMainLineLeaf(tree)
   const moves = gtpMoves(tree, leaf.id, boardSize)
@@ -64,6 +67,6 @@ export function buildStreamRequest(tree: GameTree, options: { maxVisits: number 
     boardYSize: boardSize,
     turnNumbers: Array.from({ length: moves.length + 1 }, (_, i) => i),
     maxVisits: options.maxVisits,
-    includeOwnership: true,
+    includeOwnership: true
   }
 }

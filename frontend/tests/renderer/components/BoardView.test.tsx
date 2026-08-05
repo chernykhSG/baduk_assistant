@@ -32,7 +32,15 @@ describe('BoardView', () => {
     currentTree.value = tree
     currentNodeId.value = leaf.id
     analysisByTurn.value = new Map([
-      [1, { id: 'x', moveInfos: [], rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 }, ownership: new Array(81).fill(0.9) }],
+      [
+        1,
+        {
+          id: 'x',
+          moveInfos: [],
+          rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 },
+          ownership: new Array(81).fill(0.9)
+        }
+      ]
     ])
 
     const { container } = render(<BoardView />)
@@ -45,7 +53,15 @@ describe('BoardView', () => {
     currentTree.value = tree
     currentNodeId.value = leaf.id
     analysisByTurn.value = new Map([
-      [leaf.id, { id: 'x', moveInfos: [], rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 }, ownership: new Array(81).fill(0.9) }],
+      [
+        leaf.id,
+        {
+          id: 'x',
+          moveInfos: [],
+          rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 },
+          ownership: new Array(81).fill(0.9)
+        }
+      ]
     ])
 
     const { container } = render(<BoardView />)
@@ -78,10 +94,12 @@ describe('BoardView', () => {
         1,
         {
           id: 'x',
-          moveInfos: [{ move: 'C3', winrate: 0.6, scoreLead: 1, visits: 100, prior: 0.5, pv: ['C3', 'G7'] }],
-          rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 },
-        },
-      ],
+          moveInfos: [
+            { move: 'C3', winrate: 0.6, scoreLead: 1, visits: 100, prior: 0.5, pv: ['C3', 'G7'] }
+          ],
+          rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 }
+        }
+      ]
     ])
 
     const { container } = render(<BoardView />)

@@ -7,7 +7,13 @@ import { WinrateChart } from './analysis/WinrateChart'
 import { parseSgf, getBoardSize, mainLineNodeIds, SgfParseError } from './board/sgfLoader'
 import { buildStreamRequest } from './board/gameRequestBuilder'
 import { streamAnalysis } from './ipc/client'
-import { currentTree, currentNodeId, analysisByTurn, streamStatus, streamError } from './state/appState'
+import {
+  currentTree,
+  currentNodeId,
+  analysisByTurn,
+  streamStatus,
+  streamError
+} from './state/appState'
 
 const DEFAULT_MAX_VISITS = 500
 
@@ -56,7 +62,7 @@ export function loadGame(content: string): void {
     onError(msg) {
       streamStatus.value = 'error'
       streamError.value = msg.detail
-    },
+    }
   })
 }
 
@@ -104,7 +110,9 @@ export function App(): JSX.Element {
         </div>
         <div class="app-shell__board">
           <BoardView />
-          {sgfError.value && <div class="app-shell__banner app-shell__banner--error">{sgfError.value}</div>}
+          {sgfError.value && (
+            <div class="app-shell__banner app-shell__banner--error">{sgfError.value}</div>
+          )}
           {streamStatus.value === 'error' && (
             <div class="app-shell__banner app-shell__banner--error">
               Ошибка анализа: {streamError.value}

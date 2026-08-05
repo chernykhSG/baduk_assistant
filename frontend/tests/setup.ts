@@ -16,16 +16,17 @@ afterEach(() => {
 // time (to detect device pixel ratio changes). Polyfill it so importing uplot
 // inside the test environment does not throw.
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
-  window.matchMedia = (query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  }) as unknown as MediaQueryList
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false
+    }) as unknown as MediaQueryList
 }
 
 // jsdom does not implement Path2D either — uplot uses it to build stroke/fill
@@ -38,7 +39,7 @@ if (typeof (globalThis as { Path2D?: unknown }).Path2D === 'undefined') {
       {
         get() {
           return () => {}
-        },
+        }
       }
     )
   }
@@ -82,7 +83,7 @@ if (typeof HTMLCanvasElement !== 'undefined') {
         set(_target, prop, value) {
           store[prop as string] = value
           return true
-        },
+        }
       }
     )
   } as unknown as typeof HTMLCanvasElement.prototype.getContext

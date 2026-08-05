@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { parseSgf, findMainLineLeaf } from '@renderer/board/sgfLoader'
-import { sgfCoordToGtp, mapSgfRules, buildAnalyzeRequest, buildStreamRequest } from '@renderer/board/gameRequestBuilder'
+import {
+  sgfCoordToGtp,
+  mapSgfRules,
+  buildAnalyzeRequest,
+  buildStreamRequest
+} from '@renderer/board/gameRequestBuilder'
 
 const fixtureContent = '(;GM[1]FF[4]SZ[19]KM[7.5]RU[Chinese];B[qd];W[dc];B[oq])'
 
@@ -38,7 +43,7 @@ describe('buildAnalyzeRequest', () => {
       moves: [
         ['B', 'R16'],
         ['W', 'D17'],
-        ['B', 'P3'],
+        ['B', 'P3']
       ],
       rules: 'chinese',
       komi: 7.5,
@@ -46,7 +51,7 @@ describe('buildAnalyzeRequest', () => {
       boardYSize: 19,
       analyzeTurns: [3],
       maxVisits: 500,
-      includeOwnership: true,
+      includeOwnership: true
     })
   })
 
@@ -65,7 +70,7 @@ describe('buildStreamRequest', () => {
     expect(request.moves).toEqual([
       ['B', 'R16'],
       ['W', 'D17'],
-      ['B', 'P3'],
+      ['B', 'P3']
     ])
     expect(request.turnNumbers).toEqual([0, 1, 2, 3])
     expect(request.rules).toBe('chinese')

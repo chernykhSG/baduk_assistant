@@ -18,7 +18,7 @@ afterEach(() => {
 describe('App / ConnectionGate', () => {
   it('shows a connection-error screen if the backend connection promise rejects', async () => {
     ;(window as any).baduk = {
-      getBackendConnection: vi.fn().mockRejectedValue(new Error('backend did not start')),
+      getBackendConnection: vi.fn().mockRejectedValue(new Error('backend did not start'))
     }
 
     const { getByText } = render(<App />)
@@ -30,7 +30,7 @@ describe('App / ConnectionGate', () => {
 
   it('renders the app shell once the backend connection resolves', async () => {
     ;(window as any).baduk = {
-      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' })
     }
 
     const { container } = render(<App />)
@@ -44,7 +44,7 @@ describe('App / ConnectionGate', () => {
 describe('loadGame with a rectangular-board SGF', () => {
   it('surfaces an explicit sgfError banner instead of crashing/leaving stale tree state', async () => {
     ;(window as any).baduk = {
-      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' })
     }
 
     const { container } = render(<App />)

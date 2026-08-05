@@ -17,7 +17,7 @@ describe('WinrateChart', () => {
     const { container, rerender } = render(<WinrateChart />)
     analysisByTurn.value = new Map([
       [0, { id: 'a', moveInfos: [], rootInfo: { winrate: 0.5, scoreLead: 0, visits: 1 } }],
-      [1, { id: 'b', moveInfos: [], rootInfo: { winrate: 0.55, scoreLead: 1.2, visits: 1 } }],
+      [1, { id: 'b', moveInfos: [], rootInfo: { winrate: 0.55, scoreLead: 1.2, visits: 1 } }]
     ])
     rerender(<WinrateChart />)
     expect(container.querySelector('.winrate-chart')).toBeTruthy()
