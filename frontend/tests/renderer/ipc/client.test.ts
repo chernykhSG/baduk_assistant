@@ -167,7 +167,9 @@ describe('explainPosition', () => {
       verified: null,
       message: 'Ничего заметного не найдено в этой позиции'
     }
-    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => fakeResponse }) as any
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => fakeResponse }) as any
 
     const result = await explainPosition({
       moves: [],

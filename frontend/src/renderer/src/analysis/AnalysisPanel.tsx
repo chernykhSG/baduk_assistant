@@ -12,7 +12,9 @@ export function AnalysisPanel(): JSX.Element {
         <button
           type="button"
           class={
-            tab === 'katago' ? 'analysis-panel__tab analysis-panel__tab--active' : 'analysis-panel__tab'
+            tab === 'katago'
+              ? 'analysis-panel__tab analysis-panel__tab--active'
+              : 'analysis-panel__tab'
           }
           onClick={() => setTab('katago')}
         >
@@ -20,7 +22,11 @@ export function AnalysisPanel(): JSX.Element {
         </button>
         <button
           type="button"
-          class={tab === 'llm' ? 'analysis-panel__tab analysis-panel__tab--active' : 'analysis-panel__tab'}
+          class={
+            tab === 'llm'
+              ? 'analysis-panel__tab analysis-panel__tab--active'
+              : 'analysis-panel__tab'
+          }
           onClick={() => setTab('llm')}
         >
           LLM

@@ -17,7 +17,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd backend
 .venv\Scripts\python.exe -m pytest -v              # юнит-тесты (integration-маркер исключён по умолчанию)
 .venv\Scripts\python.exe -m pytest -v -m integration  # реальный KataGo — требует BADUK_KATAGO_BINARY/BADUK_KATAGO_MODEL
+                                                       # (тот же прогон также содержит тест реального Claude API — требует BADUK_CLAUDE_API_KEY, самостоятельно скипается без него)
 ```
+Backend-сервис (`run()` в `main.py`) при старте требует `BADUK_CLAUDE_API_KEY` (fail-fast, `RuntimeError` без него) — используется эндпоинтом `/api/explain`. `BADUK_CLAUDE_MODEL` опционален и переопределяет модель по умолчанию для этого эндпоинта.
 
 **Frontend** (`frontend/`, Electron+TS+Preact, `pnpm`):
 ```powershell
