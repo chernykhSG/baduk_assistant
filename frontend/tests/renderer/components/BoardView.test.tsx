@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/preact'
 import { BoardView } from '@renderer/board/BoardView'
 import { currentTree, currentNodeId, analysisByTurn } from '@renderer/state/appState'

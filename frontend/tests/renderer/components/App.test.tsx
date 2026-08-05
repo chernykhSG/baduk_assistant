@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/preact'
-import { App, loadGame } from '@renderer/App'
+import { App, loadGame, sgfError } from '@renderer/App'
 import { currentTree, currentNodeId, streamStatus, streamError } from '@renderer/state/appState'
 
 beforeEach(() => {
@@ -12,6 +12,7 @@ afterEach(() => {
   currentNodeId.value = null
   streamStatus.value = 'idle'
   streamError.value = null
+  sgfError.value = null
 })
 
 describe('App / ConnectionGate', () => {

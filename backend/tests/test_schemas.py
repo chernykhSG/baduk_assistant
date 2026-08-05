@@ -50,6 +50,31 @@ def test_stream_request_rejects_empty_turn_numbers():
         StreamAnalyzeRequest(turnNumbers=[], **_base_fields())
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"maxVisits": 0},
+        {"maxVisits": -1},
+        {"komi": 151},
+        {"komi": -151},
+        {"boardXSize": 1},
+        {"boardXSize": 26},
+        {"boardYSize": 1},
+        {"boardYSize": 26},
+    ],
+)
+def test_analyze_request_rejects_out_of_range_values(overrides):
+    fields = _base_fields()
+    fields.update(overrides)
+    with pytest.raises(ValidationError):
+        AnalyzeRequest(analyzeTurns=[0], **fields)
+
+
+def test_stream_request_rejects_too_many_turn_numbers():
+    with pytest.raises(ValidationError):
+        StreamAnalyzeRequest(turnNumbers=list(range(1001)), **_base_fields())
+
+
 def test_analyze_response_parses_katago_style_payload():
     response = AnalyzeResponse.model_validate(
         {

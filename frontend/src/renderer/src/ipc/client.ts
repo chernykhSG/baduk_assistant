@@ -51,7 +51,13 @@ let connectionPromise: Promise<{ port: number; token: string }> | null = null
 
 function getConnection(): Promise<{ port: number; token: string }> {
   if (!connectionPromise) {
-    connectionPromise = window.baduk.getBackendConnection()
+    // Clear the cache on rejection so a later call retries instead of
+    // replaying the same failure forever (e.g. backend sidecar was still
+    // starting up on the first attempt).
+    connectionPromise = window.baduk.getBackendConnection().catch((err) => {
+      connectionPromise = null
+      throw err
+    })
   }
   return connectionPromise
 }
@@ -91,7 +97,7 @@ export function streamAnalysis(
     ws.addEventListener('open', () => {
       ws!.send(JSON.stringify(request))
     })
-    ws.addEventListener('message', (event: any) => {
+    ws.addEventListener('message', (event: MessageEvent) => {
       const msg = JSON.parse(event.data as string)
       if (msg.type === 'progress') handlers.onProgress(msg)
       else if (msg.type === 'done') {
@@ -106,7 +112,7 @@ export function streamAnalysis(
       finished = true
       handlers.onError({ type: 'error', detail: 'WebSocket connection error' })
     })
-    ws.addEventListener('close', (event: any) => {
+    ws.addEventListener('close', (event: CloseEvent) => {
       if (finished || closed) return
       finished = true
       handlers.onError({ type: 'error', detail: `WebSocket closed unexpectedly (code ${event.code})` })

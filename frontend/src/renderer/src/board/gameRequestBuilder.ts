@@ -1,8 +1,7 @@
 import type GameTree from '@sabaki/immutable-gametree'
 import { getBoardSize, findMainLineLeaf, movesFromRootToNode } from './sgfLoader'
+import { GTP_COLUMNS } from './gtpColumns'
 import type { AnalyzeRequest, StreamAnalyzeRequest } from '../ipc/client'
-
-const GTP_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 export function sgfCoordToGtp(sgfCoord: string | null, boardSize: number): string {
   if (!sgfCoord) return 'pass'
@@ -15,7 +14,11 @@ const KNOWN_RULES = ['chinese', 'japanese', 'korean', 'aga', 'nz', 'tromp-taylor
 
 export function mapSgfRules(ruValue: string | undefined): string {
   const normalized = ruValue?.toLowerCase().trim()
-  return normalized && KNOWN_RULES.includes(normalized) ? normalized : 'chinese'
+  if (normalized && KNOWN_RULES.includes(normalized)) return normalized
+  if (normalized) {
+    console.warn(`Unrecognized SGF ruleset "${ruValue}", defaulting to chinese rules`)
+  }
+  return 'chinese'
 }
 
 function extractKomi(tree: GameTree): number {

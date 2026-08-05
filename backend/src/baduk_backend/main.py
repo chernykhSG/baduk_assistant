@@ -66,12 +66,12 @@ def run() -> None:
     import uvicorn
 
     engine_manager, config_path = _build_engine_manager()
-    app.state.engine_manager = engine_manager
-    app.state.engine_lock = asyncio.Lock()
-
-    port = _find_free_port()
-    print(build_startup_message(port, AUTH_TOKEN), flush=True)
     try:
+        app.state.engine_manager = engine_manager
+        app.state.engine_lock = asyncio.Lock()
+
+        port = _find_free_port()
+        print(build_startup_message(port, AUTH_TOKEN), flush=True)
         uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
     finally:
         engine_manager.stop()

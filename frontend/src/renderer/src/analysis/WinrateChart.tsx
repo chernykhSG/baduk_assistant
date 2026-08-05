@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'preact/hooks'
+import type { JSX } from 'preact'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import { effect } from '@preact/signals'
@@ -11,7 +12,7 @@ import { analysisByTurn, currentNodeId } from '../state/appState'
 const AXIS_TEXT_COLOR = '#c6c9d1'
 const AXIS_GRID_COLOR = 'rgba(198, 201, 209, 0.15)'
 
-export function WinrateChart() {
+export function WinrateChart(): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const plotRef = useRef<uPlot | null>(null)
 

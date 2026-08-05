@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { BoundedGoban } from '@sabaki/shudan'
 import '@sabaki/shudan/css/goban.css'
 import { currentBoardPosition, currentMoveAnalysis } from '../state/appState'
+import { GTP_COLUMNS } from './gtpColumns'
+import type { JSX } from 'preact'
 import type { MoveInfo } from '../ipc/client'
 
 const MAX_SUGGESTED_MOVES = 5
@@ -86,8 +88,6 @@ function ownershipToHeatMap(
   return grid
 }
 
-const GTP_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
-
 function gtpToVertex(gtpCoord: string, boardSize: number): [number, number] | null {
   if (gtpCoord === 'pass') return null
   const col = GTP_COLUMNS.indexOf(gtpCoord[0].toUpperCase())
@@ -96,7 +96,7 @@ function gtpToVertex(gtpCoord: string, boardSize: number): [number, number] | nu
   return [col, boardSize - row]
 }
 
-export function BoardView() {
+export function BoardView(): JSX.Element {
   const [hoveredVertex, setHoveredVertex] = useState<[number, number] | null>(null)
   const [containerRef, containerSize] = useContainerSize()
   const [showOwnership, setShowOwnership] = useState(true)

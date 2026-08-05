@@ -1,5 +1,6 @@
 import { useEffect } from 'preact/hooks'
 import { signal } from '@preact/signals'
+import type { JSX } from 'preact'
 import { BoardView } from './board/BoardView'
 import { VariationTree } from './board/VariationTree'
 import { WinrateChart } from './analysis/WinrateChart'
@@ -12,12 +13,12 @@ const DEFAULT_MAX_VISITS = 500
 
 const connectionState = signal<'pending' | 'ready' | 'error'>('pending')
 const connectionErrorMessage = signal<string | null>(null)
-const sgfError = signal<string | null>(null)
+export const sgfError = signal<string | null>(null)
 const lastLoadedSgfContent = signal<string | null>(null)
 
 let closeCurrentStream: (() => void) | null = null
 
-export function loadGame(content: string) {
+export function loadGame(content: string): void {
   closeCurrentStream?.()
   closeCurrentStream = null
 
@@ -59,18 +60,18 @@ export function loadGame(content: string) {
   })
 }
 
-function handleDrop(event: DragEvent) {
+function handleDrop(event: DragEvent): void {
   event.preventDefault()
   const file = event.dataTransfer?.files?.[0]
   if (!file) return
   file.text().then(loadGame)
 }
 
-function handleDragOver(event: DragEvent) {
+function handleDragOver(event: DragEvent): void {
   event.preventDefault()
 }
 
-export function App() {
+export function App(): JSX.Element {
   useEffect(() => {
     window.baduk
       .getBackendConnection()

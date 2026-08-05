@@ -18,15 +18,18 @@ class RootInfo(BaseModel):
     visits: int
 
 
-class AnalyzeRequest(BaseModel):
+class _BaseAnalyzeRequest(BaseModel):
     moves: list[list[str]] = Field(default_factory=list)
     rules: str
-    komi: float
-    boardXSize: int
-    boardYSize: int
-    analyzeTurns: list[int] = Field(min_length=1, max_length=1)
-    maxVisits: int
+    komi: float = Field(ge=-150, le=150)
+    boardXSize: int = Field(ge=2, le=25)
+    boardYSize: int = Field(ge=2, le=25)
+    maxVisits: int = Field(gt=0, le=100_000)
     includeOwnership: bool = False
+
+
+class AnalyzeRequest(_BaseAnalyzeRequest):
+    analyzeTurns: list[int] = Field(min_length=1, max_length=1)
 
 
 class AnalyzeResponse(BaseModel):
@@ -37,15 +40,8 @@ class AnalyzeResponse(BaseModel):
     ownership: list[float] | None = None
 
 
-class StreamAnalyzeRequest(BaseModel):
-    moves: list[list[str]] = Field(default_factory=list)
-    rules: str
-    komi: float
-    boardXSize: int
-    boardYSize: int
-    turnNumbers: list[int] = Field(min_length=1)
-    maxVisits: int
-    includeOwnership: bool = False
+class StreamAnalyzeRequest(_BaseAnalyzeRequest):
+    turnNumbers: list[int] = Field(min_length=1, max_length=1000)
 
 
 class ProgressMessage(BaseModel):

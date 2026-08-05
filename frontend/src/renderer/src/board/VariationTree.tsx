@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'preact/hooks'
-import type { ComponentChild } from 'preact'
+import type { ComponentChild, JSX } from 'preact'
 import { currentTree, currentNodeId } from '../state/appState'
 import type { NodeObject } from './sgfLoader'
 
-function stepDown() {
+function stepDown(): void {
   const tree = currentTree.value
   const nodeId = currentNodeId.value
   if (!tree || nodeId === null) return
@@ -13,7 +13,7 @@ function stepDown() {
   }
 }
 
-function stepUp() {
+function stepUp(): void {
   const tree = currentTree.value
   const nodeId = currentNodeId.value
   if (!tree || nodeId === null) return
@@ -23,7 +23,7 @@ function stepUp() {
   }
 }
 
-export function VariationTree() {
+export function VariationTree(): JSX.Element {
   const tree = currentTree.value
   const nodeId = currentNodeId.value
   const currentRef = useRef<HTMLButtonElement | null>(null)
@@ -65,7 +65,7 @@ export function VariationTree() {
     </div>
   )
 
-  function renderMarker(node: NodeObject) {
+  function renderMarker(node: NodeObject): JSX.Element {
     const isCurrent = node.id === nodeId
     const colorClass = node.data.B
       ? 'variation-tree__marker--black'
@@ -91,7 +91,7 @@ export function VariationTree() {
   // not a staircase). Indentation only appears at an actual branch point,
   // where every child — including what would've been the "main" line —
   // becomes its own indented sub-chain.
-  function renderChain(startNode: NodeObject) {
+  function renderChain(startNode: NodeObject): ComponentChild[] {
     const items: ComponentChild[] = []
     let node: NodeObject | null = startNode
     while (node) {
