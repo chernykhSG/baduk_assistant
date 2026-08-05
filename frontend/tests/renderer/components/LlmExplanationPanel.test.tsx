@@ -4,6 +4,7 @@ import { LlmExplanationPanel } from '@renderer/analysis/LlmExplanationPanel'
 import { currentTree, currentNodeId, analysisByTurn } from '@renderer/state/appState'
 import { parseSgf, findMainLineLeaf, mainLineNodeIds } from '@renderer/board/sgfLoader'
 import { explainPosition } from '@renderer/ipc/client'
+import type { ExplainResponse } from '@renderer/ipc/client'
 
 vi.mock('@renderer/ipc/client', () => ({
   explainPosition: vi.fn()
@@ -134,6 +135,78 @@ describe('LlmExplanationPanel', () => {
     await waitFor(() => {
       expect(queryByText('Объяснение для позиции A')).toBeNull()
     })
+    expect((getByText('Объяснить эту позицию') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('drops a stale in-flight response that resolves after navigating away', async () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee];W[gg])')
+    const [, nodeA, nodeB] = mainLineNodeIds(tree)
+    currentTree.value = tree
+    currentNodeId.value = nodeA
+    analysisByTurn.value = new Map([
+      [
+        nodeA,
+        {
+          id: 'a',
+          moveInfos: [],
+          rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 },
+          ownership: new Array(81).fill(0)
+        }
+      ],
+      [
+        nodeB,
+        {
+          id: 'b',
+          moveInfos: [],
+          rootInfo: { winrate: 0.4, scoreLead: -1, visits: 100 },
+          ownership: new Array(81).fill(0)
+        }
+      ]
+    ])
+
+    let resolveExplain!: (value: ExplainResponse) => void
+    mockExplainPosition.mockImplementation(
+      () =>
+        new Promise<ExplainResponse>((resolve) => {
+          resolveExplain = resolve
+        })
+    )
+
+    const { getByText, queryByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Объяснить эту позицию'))
+
+    await waitFor(() => {
+      expect(getByText('Анализирую...')).toBeTruthy()
+    })
+
+    // Navigate to a different position while A's request is still in flight.
+    currentNodeId.value = nodeB
+
+    // Let the position-change reset (round-1 fix) fully settle first, so this
+    // assertion isolates the in-flight-response guard specifically, rather
+    // than accidentally passing because of that unrelated effect's timing.
+    await waitFor(() => {
+      expect((getByText('Объяснить эту позицию') as HTMLButtonElement).disabled).toBe(false)
+    })
+
+    // A's response arrives late, after the user has already moved on and
+    // settled on B's (already-idle) state.
+    resolveExplain({
+      finding: null,
+      explanation: { summary: 'Объяснение для позиции A (устарело)', claims: [] },
+      verified: true,
+      message: null
+    })
+
+    // Force every pending microtask (the `await explainPosition(...)`
+    // continuation and any state-update flush it triggers) to drain before
+    // asserting — a `waitFor` whose very first synchronous check happens to
+    // pass (simply because the continuation hasn't run yet) would return
+    // immediately without ever re-checking, silently hiding the race this
+    // test exists to catch.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(queryByText('Объяснение для позиции A (устарело)')).toBeNull()
     expect((getByText('Объяснить эту позицию') as HTMLButtonElement).disabled).toBe(false)
   })
 })

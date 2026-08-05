@@ -27,20 +27,27 @@ export function LlmExplanationPanel(): JSX.Element {
 
   async function handleExplain(): Promise<void> {
     if (!tree || nodeId === null || !analysis) return
+    // Capture the position this specific request was made for, so that if
+    // the user navigates elsewhere before the response arrives, the stale
+    // response below can be detected and dropped instead of repopulating
+    // the panel with an explanation attributed to the wrong position.
+    const requestedNodeId = nodeId
     setStatus('loading')
     setErrorMessage(null)
     try {
       const boardSize = getBoardSize(tree)
-      const moves = gtpMoves(tree, nodeId, boardSize)
+      const moves = gtpMoves(tree, requestedNodeId, boardSize)
       const response = await explainPosition({
         moves,
         boardXSize: boardSize,
         boardYSize: boardSize,
         analysis
       })
+      if (currentNodeId.value !== requestedNodeId) return
       setResult(response)
       setStatus('done')
     } catch (err) {
+      if (currentNodeId.value !== requestedNodeId) return
       setErrorMessage(err instanceof Error ? err.message : 'Не удалось получить объяснение')
       setStatus('error')
     }
