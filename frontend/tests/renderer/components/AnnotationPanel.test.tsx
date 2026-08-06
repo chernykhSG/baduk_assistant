@@ -46,6 +46,26 @@ describe('AnnotationPanel', () => {
     expect(isDirty.value).toBe(true)
   })
 
+  it('does not mark dirty or commit the tree when blur happens with no edits', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee]C[Исходный комментарий])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+    isDirty.value = false
+
+    const { getByRole } = render(<AnnotationPanel />)
+    const textarea = getByRole('textbox') as HTMLTextAreaElement
+
+    // Focus and blur without any input event
+    fireEvent.focus(textarea)
+    fireEvent.blur(textarea)
+
+    // Tree should be unchanged and isDirty should stay false
+    const node = currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }
+    expect(node.data.C).toEqual(['Исходный комментарий'])
+    expect(isDirty.value).toBe(false)
+  })
+
   it('reloads the textarea contents when the current node changes', async () => {
     const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee]C[Первый];W[ec]C[Второй])')
     const root = tree.root as { children: { id: number }[] }
