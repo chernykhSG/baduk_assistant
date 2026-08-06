@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { startBackend, stopBackend, type BackendConnection } from './backendConnection'
+import { saveFile, saveFileAs } from './fileIO'
 
 // Opt-in Chrome DevTools Protocol access for debugging sessions that have no
 // interactive devtools available (e.g. driven from a terminal). Must be set
@@ -74,6 +75,10 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   ipcMain.handle('backend:get-connection', () => getBackendConnection())
+  ipcMain.handle('file:save', (_event, path: string, content: string) => saveFile(path, content))
+  ipcMain.handle('file:save-as', (_event, defaultPath: string | undefined, content: string) =>
+    saveFileAs(defaultPath, content)
+  )
 
   createWindow()
 
