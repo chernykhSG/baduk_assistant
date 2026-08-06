@@ -180,4 +180,26 @@ describe('buildAnnotationMarkerMap', () => {
 
     expect(buildAnnotationMarkerMap(tree.get(leaf.id) as NodeObject, 9)).toEqual(emptyMarkerGrid(9))
   })
+
+  it('skips out-of-range markup coordinates instead of throwing', () => {
+    // 'zz' -> vertex [25, 25], far outside a 9x9 board (e.g. leftover 19-board
+    // markup, or a hand-edited/foreign SGF).
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee]TR[zz]SQ[cc])')
+    const leaf = findMainLineLeaf(tree)
+    const node = tree.get(leaf.id) as NodeObject
+
+    let grid: ReturnType<typeof buildAnnotationMarkerMap> | undefined
+    expect(() => {
+      grid = buildAnnotationMarkerMap(node, 9)
+    }).not.toThrow()
+
+    // Other valid markup on the same node still renders normally.
+    expect(grid![2][2]).toEqual({ type: 'square' })
+    // No marker exists anywhere for the malformed 'zz' entry — every cell is
+    // either null or the one valid square marker above.
+    const onlyExpectedMarkers = grid!.every((row) =>
+      row.every((cell) => cell === null || cell.type === 'square')
+    )
+    expect(onlyExpectedMarkers).toBe(true)
+  })
 })

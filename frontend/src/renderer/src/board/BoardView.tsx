@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { BoundedGoban } from '@sabaki/shudan'
 import '@sabaki/shudan/css/goban.css'
-import { currentBoardPosition, currentMoveAnalysis, currentNode } from '../state/appState'
+import {
+  currentBoardPosition,
+  currentMoveAnalysis,
+  currentNode,
+  currentTree,
+  currentNodeId,
+  isDirty
+} from '../state/appState'
 import { GTP_COLUMNS } from './gtpColumns'
 import {
   addFigureMarkup,
   addLabelMarkup,
   removeMarkupAtVertex,
   buildAnnotationMarkerMap,
-  emptyMarkerGrid
+  emptyMarkerGrid,
+  hasMarkupAtVertex
 } from './annotations'
 import type { AnnotationTool } from './annotations'
-import { currentTree, currentNodeId, isDirty } from '../state/appState'
+import type { NodeObject } from './sgfLoader'
 import {
   selectedAnnotationTool,
   labelMode,
@@ -81,6 +89,11 @@ function buildMarkerMap(
   // overlays below only fill vertices the user hasn't already marked.
   const grid = userMarkerMap.map((row) => [...row])
 
+  // A last-move 'point' marker takes priority over a PV rank label at the
+  // same vertex (checked below) — this is intentional and matches the
+  // "user/board markup wins" priority model from the annotation feature,
+  // even though in practice a suggested move never lands exactly on the
+  // stone that was just played.
   if (lastMoveVertex && !grid[lastMoveVertex[1]][lastMoveVertex[0]]) {
     grid[lastMoveVertex[1]][lastMoveVertex[0]] = { type: 'point' }
   }
@@ -126,8 +139,16 @@ function applyAnnotationTool(tool: AnnotationTool, vertex: [number, number]): vo
   if (!tree || nodeId === null) return
 
   if (tool === 'erase') {
+    // Only mutate (and mark dirty) if there was actually something to erase
+    // at this vertex — clicking an empty vertex with the eraser selected
+    // should be a no-op, not a spurious dirty flag.
+    const node = tree.get(nodeId) as NodeObject | null
+    if (!node || !hasMarkupAtVertex(node, vertex)) return
     currentTree.value = removeMarkupAtVertex(tree, nodeId, vertex)
   } else if (tool === 'LB') {
+    // An empty label text (user cleared the input) must not place a label
+    // with empty text — skip placement entirely, no mutation.
+    if (pendingLabelText.value === '') return
     currentTree.value = addLabelMarkup(tree, nodeId, vertex, pendingLabelText.value)
     labelTextOverride.value = null
   } else {
@@ -227,7 +248,9 @@ export function BoardView(): JSX.Element {
               class="board-view__label-input"
               type="text"
               value={pendingLabelText.value}
-              onInput={(event) => (labelTextOverride.value = (event.target as HTMLInputElement).value)}
+              onInput={(event) =>
+                (labelTextOverride.value = (event.target as HTMLInputElement).value)
+              }
             />
           </>
         )}

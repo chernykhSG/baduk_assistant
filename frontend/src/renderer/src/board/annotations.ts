@@ -115,13 +115,20 @@ export function emptyMarkerGrid(boardSize: number): (Marker | null)[][] {
   return grid
 }
 
+function isInBounds(vertex: [number, number], boardSize: number): boolean {
+  return vertex[0] >= 0 && vertex[0] < boardSize && vertex[1] >= 0 && vertex[1] < boardSize
+}
+
 export function buildAnnotationMarkerMap(node: NodeObject, boardSize: number): (Marker | null)[][] {
   const grid = emptyMarkerGrid(boardSize)
 
   for (const property of FIGURE_PROPERTIES) {
     for (const coord of node.data[property] ?? []) {
       const vertex = sgfCoordToVertex(coord)
-      if (!vertex) continue
+      // A foreign/hand-edited SGF (or markup left over from a larger board
+      // size) can carry coordinates outside the current board — skip those
+      // instead of indexing out of bounds and crashing the render.
+      if (!vertex || !isInBounds(vertex, boardSize)) continue
       grid[vertex[1]][vertex[0]] = { type: FIGURE_TO_MARKER_TYPE[property] }
     }
   }
@@ -132,9 +139,18 @@ export function buildAnnotationMarkerMap(node: NodeObject, boardSize: number): (
     const coord = entry.slice(0, separatorIndex)
     const label = entry.slice(separatorIndex + 1)
     const vertex = sgfCoordToVertex(coord)
-    if (!vertex) continue
+    if (!vertex || !isInBounds(vertex, boardSize)) continue
     grid[vertex[1]][vertex[0]] = { type: 'label', label }
   }
 
   return grid
+}
+
+/** Whether the given node already has any figure/label markup at this vertex's SGF coordinate. */
+export function hasMarkupAtVertex(node: NodeObject, vertex: [number, number]): boolean {
+  const coord = vertexToSgfCoord(vertex)
+  for (const property of FIGURE_PROPERTIES) {
+    if (node.data[property]?.includes(coord)) return true
+  }
+  return (node.data.LB ?? []).some((entry) => entry.split(':')[0] === coord)
 }

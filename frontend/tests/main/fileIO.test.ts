@@ -1,10 +1,9 @@
-/// <reference types="vitest" />
-/// <vitest environment="node" />
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockWriteFile } = vi.hoisted(() => {
+const { mockWriteFile, mockRename } = vi.hoisted(() => {
   return {
-    mockWriteFile: vi.fn()
+    mockWriteFile: vi.fn(),
+    mockRename: vi.fn()
   }
 })
 
@@ -23,7 +22,7 @@ vi.mock('node:fs/promises', () => {
       unlink: vi.fn(),
       mkdir: vi.fn(),
       rmdir: vi.fn(),
-      rename: vi.fn(),
+      rename: mockRename,
       stat: vi.fn(),
       access: vi.fn()
     },
@@ -33,7 +32,7 @@ vi.mock('node:fs/promises', () => {
     unlink: vi.fn(),
     mkdir: vi.fn(),
     rmdir: vi.fn(),
-    rename: vi.fn(),
+    rename: mockRename,
     stat: vi.fn(),
     access: vi.fn()
   }
@@ -48,21 +47,34 @@ import { saveFile, saveFileAs, promptUnsavedChangesChoice } from '../../src/main
 
 beforeEach(() => {
   mockWriteFile.mockReset().mockResolvedValue(undefined)
+  mockRename.mockReset().mockResolvedValue(undefined)
   mockShowSaveDialog.mockReset()
 })
 
 describe('saveFile', () => {
-  it('writes the given content to the given path as utf-8', async () => {
+  it('writes to a temp path next to the target, then atomically renames it into place', async () => {
     await saveFile('/games/example.sgf', '(;GM[1])')
 
-    expect(mockWriteFile).toHaveBeenCalledWith('/games/example.sgf', '(;GM[1])', 'utf-8')
+    expect(mockWriteFile).toHaveBeenCalledWith('/games/example.sgf.tmp', '(;GM[1])', 'utf-8')
+    expect(mockRename).toHaveBeenCalledWith('/games/example.sgf.tmp', '/games/example.sgf')
+    // writeFile must land on the temp path before rename moves it to the final one.
+    expect(mockWriteFile.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRename.mock.invocationCallOrder[0]
+    )
   })
 
-  it('propagates a write failure', async () => {
+  it('propagates a write failure without renaming (leaves the original file untouched)', async () => {
     mockWriteFile.mockRejectedValue(new Error('EACCES: permission denied'))
 
-    await expect(saveFile('/readonly/example.sgf', '(;GM[1])')).rejects.toThrow(
-      'permission denied'
+    await expect(saveFile('/readonly/example.sgf', '(;GM[1])')).rejects.toThrow('permission denied')
+    expect(mockRename).not.toHaveBeenCalled()
+  })
+
+  it('propagates a rename failure', async () => {
+    mockRename.mockRejectedValue(new Error('EXDEV: cross-device link not permitted'))
+
+    await expect(saveFile('/games/example.sgf', '(;GM[1])')).rejects.toThrow(
+      'cross-device link not permitted'
     )
   })
 })

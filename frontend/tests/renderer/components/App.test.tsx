@@ -1,7 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, waitFor, fireEvent } from '@testing-library/preact'
 import { App, loadGame, sgfError, saveCurrentGame, saveError } from '@renderer/App'
-import { currentTree, currentNodeId, streamStatus, streamError, currentFilePath, isDirty } from '@renderer/state/appState'
+import {
+  currentTree,
+  currentNodeId,
+  streamStatus,
+  streamError,
+  currentFilePath,
+  isDirty
+} from '@renderer/state/appState'
 
 beforeEach(() => {
   ;(globalThis as any).window = (globalThis as any).window ?? {}
@@ -119,10 +126,12 @@ describe('save flow', () => {
     expect(saveButton.disabled).toBe(false)
 
     fireEvent.click(saveButton)
-    await waitFor(() => expect((window as any).baduk.saveFile).toHaveBeenCalledWith(
-      '/games/example.sgf',
-      expect.stringContaining('GM[1]')
-    ))
+    await waitFor(() =>
+      expect((window as any).baduk.saveFile).toHaveBeenCalledWith(
+        '/games/example.sgf',
+        expect.stringContaining('GM[1]')
+      )
+    )
     await waitFor(() => expect(isDirty.value).toBe(false))
   })
 
@@ -166,6 +175,80 @@ describe('save flow', () => {
 
     fireEvent.click(getByText('Сохранить'))
     await waitFor(() => expect(getByText(/disk full/)).toBeTruthy())
+    expect(isDirty.value).toBe(true)
+  })
+
+  it('calling saveCurrentGame directly writes to the known path (not just via the button click)', async () => {
+    const saveFile = vi.fn().mockResolvedValue(undefined)
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      saveFile,
+      saveFileAs: vi.fn(),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    loadGame('(;GM[1]FF[4]SZ[9];B[ee])', '/games/example.sgf')
+    isDirty.value = true
+
+    await saveCurrentGame()
+
+    expect(saveFile).toHaveBeenCalledWith('/games/example.sgf', expect.stringContaining('GM[1]'))
+    expect(isDirty.value).toBe(false)
+  })
+
+  it('"Сохранить как" always opens the save dialog, even when a file path is already known (unlike "Сохранить")', async () => {
+    const saveFile = vi.fn()
+    const saveFileAs = vi.fn().mockResolvedValue({ path: '/games/new-name.sgf' })
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      saveFile,
+      saveFileAs,
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    loadGame('(;GM[1]FF[4]SZ[9];B[ee])', '/games/example.sgf')
+    await waitFor(() => expect(getByText(/example\.sgf/)).toBeTruthy())
+
+    fireEvent.click(getByText('Сохранить как'))
+
+    await waitFor(() =>
+      expect(saveFileAs).toHaveBeenCalledWith(
+        '/games/example.sgf',
+        expect.stringContaining('GM[1]')
+      )
+    )
+    expect(saveFile).not.toHaveBeenCalled()
+    await waitFor(() => expect(currentFilePath.value).toBe('/games/new-name.sgf'))
+  })
+
+  it('refuses to save and shows a warning banner when the loaded game declares a non-UTF-8 charset', async () => {
+    const saveFile = vi.fn().mockResolvedValue(undefined)
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      saveFile,
+      saveFileAs: vi.fn(),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    loadGame('(;GM[1]FF[4]SZ[9]CA[Shift_JIS];B[ee])', '/games/example.sgf')
+    isDirty.value = true
+
+    fireEvent.click(getByText('Сохранить'))
+
+    await waitFor(() => expect(getByText(/Shift_JIS/)).toBeTruthy())
+    expect(saveFile).not.toHaveBeenCalled()
     expect(isDirty.value).toBe(true)
   })
 })

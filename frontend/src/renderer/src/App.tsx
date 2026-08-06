@@ -1,10 +1,12 @@
 import { useEffect } from 'preact/hooks'
 import { signal, useSignalEffect } from '@preact/signals'
 import type { JSX } from 'preact'
+import type GameTree from '@sabaki/immutable-gametree'
 import { BoardView } from './board/BoardView'
 import { VariationTree } from './board/VariationTree'
 import { AnalysisPanel } from './analysis/AnalysisPanel'
 import { parseSgf, getBoardSize, mainLineNodeIds, SgfParseError } from './board/sgfLoader'
+import type { NodeObject } from './board/sgfLoader'
 import { buildStreamRequest } from './board/gameRequestBuilder'
 import { serializeTree } from './board/sgfSerializer'
 import { streamAnalysis } from './ipc/client'
@@ -17,6 +19,7 @@ import {
   currentFilePath,
   isDirty
 } from './state/appState'
+import { selectedAnnotationTool, labelTextOverride } from './state/annotationToolState'
 
 const DEFAULT_MAX_VISITS = 500
 
@@ -28,6 +31,21 @@ const lastLoadedSgfContent = signal<string | null>(null)
 const lastLoadedFilePath = signal<string | null>(null)
 
 let closeCurrentStream: (() => void) | null = null
+
+/**
+ * Per user decision: reading foreign-charset SGF is not supported — rather
+ * than risk silently corrupting a non-UTF-8 file on overwrite (neither the
+ * save path nor the drop-file read path check SGF's CA[] charset property),
+ * refuse the write and point the user back at the original program.
+ * Returns true if it's safe to proceed with the save.
+ */
+function checkEncodingBeforeSave(tree: GameTree): boolean {
+  const ca = (tree.root as NodeObject).data.CA?.[0]
+  if (!ca) return true
+  if (/^utf-?8$/i.test(ca.trim())) return true
+  saveError.value = `Файл в кодировке ${ca}, не UTF-8 — сохранение отключено, чтобы не повредить партию. Отредактируйте её в исходной программе.`
+  return false
+}
 
 export function loadGame(content: string, filePath: string | null = null): void {
   closeCurrentStream?.()
@@ -51,6 +69,9 @@ export function loadGame(content: string, filePath: string | null = null): void 
   currentNodeId.value = tree.root.id
   currentFilePath.value = filePath
   isDirty.value = false
+  saveError.value = null
+  selectedAnnotationTool.value = null
+  labelTextOverride.value = null
   analysisByTurn.value = new Map()
   streamStatus.value = 'streaming'
   streamError.value = null
@@ -77,8 +98,9 @@ export function loadGame(content: string, filePath: string | null = null): void 
 export async function saveCurrentGame(): Promise<void> {
   const tree = currentTree.value
   if (!tree) return
-  const content = serializeTree(tree)
   saveError.value = null
+  if (!checkEncodingBeforeSave(tree)) return
+  const content = serializeTree(tree)
   try {
     if (currentFilePath.value) {
       await window.baduk.saveFile(currentFilePath.value, content)
@@ -97,8 +119,9 @@ export async function saveCurrentGame(): Promise<void> {
 export async function saveCurrentGameAs(): Promise<void> {
   const tree = currentTree.value
   if (!tree) return
-  const content = serializeTree(tree)
   saveError.value = null
+  if (!checkEncodingBeforeSave(tree)) return
+  const content = serializeTree(tree)
   try {
     const result = await window.baduk.saveFileAs(currentFilePath.value ?? undefined, content)
     if ('canceled' in result) return
@@ -167,7 +190,11 @@ export function App(): JSX.Element {
         <button type="button" disabled={!currentTree.value} onClick={() => void saveCurrentGame()}>
           Сохранить
         </button>
-        <button type="button" disabled={!currentTree.value} onClick={() => void saveCurrentGameAs()}>
+        <button
+          type="button"
+          disabled={!currentTree.value}
+          onClick={() => void saveCurrentGameAs()}
+        >
           Сохранить как
         </button>
         {saveError.value && <span class="app-shell__header-error">{saveError.value}</span>}

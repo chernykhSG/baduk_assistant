@@ -1,8 +1,14 @@
-import { writeFile } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 import { dialog, type BrowserWindow } from 'electron'
 
 export async function saveFile(path: string, content: string): Promise<void> {
-  await writeFile(path, content, 'utf-8')
+  // Write to a temp path in the same directory first, then rename it over
+  // the target — rename is atomic on the same filesystem/volume (both
+  // Windows and POSIX), so a crash or disk-full failure mid-write leaves
+  // the original file intact instead of truncated/corrupted.
+  const tempPath = `${path}.tmp`
+  await writeFile(tempPath, content, 'utf-8')
+  await rename(tempPath, path)
 }
 
 export async function saveFileAs(

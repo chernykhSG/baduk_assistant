@@ -172,9 +172,9 @@ describe('BoardView', () => {
     const vertex = container.querySelector('[data-x="2"][data-y="2"]')
     fireEvent.click(vertex as Element)
 
-    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.TR).toEqual([
-      'cc'
-    ])
+    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.TR).toEqual(
+      ['cc']
+    )
   })
 
   it('places the pending label text and then resets the override for the next placement', () => {
@@ -189,9 +189,9 @@ describe('BoardView', () => {
     const vertex = container.querySelector('[data-x="0"][data-y="0"]')
     fireEvent.click(vertex as Element)
 
-    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.LB).toEqual([
-      'aa:Z'
-    ])
+    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.LB).toEqual(
+      ['aa:Z']
+    )
     expect(labelTextOverride.value).toBeNull()
   })
 
@@ -221,7 +221,9 @@ describe('BoardView', () => {
     const vertex = container.querySelector('[data-x="2"][data-y="2"]')
     fireEvent.click(vertex as Element)
 
-    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.TR).toBeUndefined()
+    expect(
+      (currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.TR
+    ).toBeUndefined()
   })
 
   it('renders one button per annotation tool in the toolbar', () => {

@@ -41,6 +41,10 @@ function createWindow(): void {
     mainWindow!.show()
   })
 
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
   mainWindow.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
     console.log(`[renderer] ${message} (${sourceId}:${line})`)
   })
@@ -53,7 +57,7 @@ function createWindow(): void {
     if (choice === 'cancel') return
     if (choice === 'close-without-saving') {
       hasUnsavedChanges = false
-      mainWindow!.destroy()
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy()
       return
     }
     mainWindow!.webContents.send('file:save-before-close')
@@ -101,7 +105,7 @@ app.whenReady().then(() => {
   ipcMain.on('file:save-before-close-result', (_event, success: boolean) => {
     if (!success) return
     hasUnsavedChanges = false
-    mainWindow?.destroy()
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy()
   })
 
   createWindow()
@@ -123,8 +127,14 @@ app.on('window-all-closed', () => {
 })
 
 // Terminate the backend sidecar process when the app is quitting, so it
-// doesn't outlive the Electron process.
-app.on('before-quit', () => {
+// doesn't outlive the Electron process. Uses 'will-quit' rather than
+// 'before-quit': 'before-quit' fires BEFORE each window's 'close' handler
+// gets a chance to prompt for unsaved changes and possibly cancel the quit,
+// so killing the backend there would leave the app open but non-functional
+// if the user chooses "Отмена". 'will-quit' only fires once Electron has
+// committed to quitting (after all 'close' handlers resolved without being
+// prevented), so a cancelled close correctly leaves the backend running.
+app.on('will-quit', () => {
   stopBackend()
 })
 
