@@ -6,13 +6,16 @@ import { VariationTree } from './board/VariationTree'
 import { AnalysisPanel } from './analysis/AnalysisPanel'
 import { parseSgf, getBoardSize, mainLineNodeIds, SgfParseError } from './board/sgfLoader'
 import { buildStreamRequest } from './board/gameRequestBuilder'
+import { serializeTree } from './board/sgfSerializer'
 import { streamAnalysis } from './ipc/client'
 import {
   currentTree,
   currentNodeId,
   analysisByTurn,
   streamStatus,
-  streamError
+  streamError,
+  currentFilePath,
+  isDirty
 } from './state/appState'
 
 const DEFAULT_MAX_VISITS = 500
@@ -20,15 +23,18 @@ const DEFAULT_MAX_VISITS = 500
 const connectionState = signal<'pending' | 'ready' | 'error'>('pending')
 const connectionErrorMessage = signal<string | null>(null)
 export const sgfError = signal<string | null>(null)
+export const saveError = signal<string | null>(null)
 const lastLoadedSgfContent = signal<string | null>(null)
+const lastLoadedFilePath = signal<string | null>(null)
 
 let closeCurrentStream: (() => void) | null = null
 
-export function loadGame(content: string): void {
+export function loadGame(content: string, filePath: string | null = null): void {
   closeCurrentStream?.()
   closeCurrentStream = null
 
   lastLoadedSgfContent.value = content
+  lastLoadedFilePath.value = filePath
   sgfError.value = null
   let tree
   try {
@@ -43,6 +49,8 @@ export function loadGame(content: string): void {
 
   currentTree.value = tree
   currentNodeId.value = tree.root.id
+  currentFilePath.value = filePath
+  isDirty.value = false
   analysisByTurn.value = new Map()
   streamStatus.value = 'streaming'
   streamError.value = null
@@ -66,11 +74,47 @@ export function loadGame(content: string): void {
   })
 }
 
+export async function saveCurrentGame(): Promise<void> {
+  const tree = currentTree.value
+  if (!tree) return
+  const content = serializeTree(tree)
+  saveError.value = null
+  try {
+    if (currentFilePath.value) {
+      await window.baduk.saveFile(currentFilePath.value, content)
+      isDirty.value = false
+    } else {
+      const result = await window.baduk.saveFileAs(undefined, content)
+      if ('canceled' in result) return
+      currentFilePath.value = result.path
+      isDirty.value = false
+    }
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : 'Не удалось сохранить файл'
+  }
+}
+
+export async function saveCurrentGameAs(): Promise<void> {
+  const tree = currentTree.value
+  if (!tree) return
+  const content = serializeTree(tree)
+  saveError.value = null
+  try {
+    const result = await window.baduk.saveFileAs(currentFilePath.value ?? undefined, content)
+    if ('canceled' in result) return
+    currentFilePath.value = result.path
+    isDirty.value = false
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : 'Не удалось сохранить файл'
+  }
+}
+
 function handleDrop(event: DragEvent): void {
   event.preventDefault()
   const file = event.dataTransfer?.files?.[0]
   if (!file) return
-  file.text().then(loadGame)
+  const filePath = window.electron.webUtils.getPathForFile(file) || null
+  file.text().then((content) => loadGame(content, filePath))
 }
 
 function handleDragOver(event: DragEvent): void {
@@ -104,6 +148,19 @@ export function App(): JSX.Element {
 
   return (
     <div class="app-shell" onDrop={handleDrop} onDragOver={handleDragOver}>
+      <div class="app-shell__header">
+        <span class="app-shell__filename">
+          {currentFilePath.value ? currentFilePath.value.split(/[\\/]/).pop() : 'Без файла'}
+          {isDirty.value ? ' *' : ''}
+        </span>
+        <button type="button" disabled={!currentTree.value} onClick={() => void saveCurrentGame()}>
+          Сохранить
+        </button>
+        <button type="button" disabled={!currentTree.value} onClick={() => void saveCurrentGameAs()}>
+          Сохранить как
+        </button>
+        {saveError.value && <span class="app-shell__header-error">{saveError.value}</span>}
+      </div>
       <div class="app-shell__top">
         <div class="app-shell__tree">
           <VariationTree />
@@ -118,7 +175,10 @@ export function App(): JSX.Element {
               Ошибка анализа: {streamError.value}
               <button
                 type="button"
-                onClick={() => lastLoadedSgfContent.value && loadGame(lastLoadedSgfContent.value)}
+                onClick={() =>
+                  lastLoadedSgfContent.value &&
+                  loadGame(lastLoadedSgfContent.value, lastLoadedFilePath.value)
+                }
               >
                 Повторить
               </button>

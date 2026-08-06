@@ -155,9 +155,30 @@ code {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto 1fr auto;
   height: 100vh;
   min-height: 0;
+}
+.app-shell__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+.app-shell__filename {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-shell__header-error {
+  background: #4a1414;
+  color: #ffb4b4;
+  border: 1px solid #7a2222;
+  border-radius: 4px;
+  padding: 2px 8px;
 }
 .app-shell__top {
   display: grid;

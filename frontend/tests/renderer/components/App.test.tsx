@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor } from '@testing-library/preact'
-import { App, loadGame, sgfError } from '@renderer/App'
-import { currentTree, currentNodeId, streamStatus, streamError } from '@renderer/state/appState'
+import { render, waitFor, fireEvent } from '@testing-library/preact'
+import { App, loadGame, sgfError, saveCurrentGame, saveError } from '@renderer/App'
+import { currentTree, currentNodeId, streamStatus, streamError, currentFilePath, isDirty } from '@renderer/state/appState'
 
 beforeEach(() => {
   ;(globalThis as any).window = (globalThis as any).window ?? {}
@@ -13,6 +13,9 @@ afterEach(() => {
   streamStatus.value = 'idle'
   streamError.value = null
   sgfError.value = null
+  currentFilePath.value = null
+  isDirty.value = false
+  saveError.value = null
 })
 
 describe('App / ConnectionGate', () => {
@@ -69,5 +72,86 @@ describe('loadGame with a rectangular-board SGF', () => {
     expect(currentNodeId.value).toBeNull()
     expect(streamStatus.value).toBe('idle')
     expect(streamError.value).toBeNull()
+  })
+})
+
+describe('save flow', () => {
+  it('shows "Без файла" and disables Save/Save As with no game loaded', async () => {
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' })
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    const saveButton = getByText('Сохранить') as HTMLButtonElement
+    expect(saveButton.disabled).toBe(true)
+  })
+
+  it('captures the dropped file path via window.electron.webUtils and marks the game dirty after an edit, then Save writes to that path', async () => {
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      saveFile: vi.fn().mockResolvedValue(undefined),
+      saveFileAs: vi.fn()
+    }
+    ;(window as any).electron = {
+      webUtils: { getPathForFile: vi.fn().mockReturnValue('/games/example.sgf') }
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    loadGame('(;GM[1]FF[4]SZ[9];B[ee])', '/games/example.sgf')
+    await waitFor(() => expect(getByText(/example\.sgf/)).toBeTruthy())
+
+    isDirty.value = true
+    const saveButton = getByText('Сохранить') as HTMLButtonElement
+    expect(saveButton.disabled).toBe(false)
+
+    fireEvent.click(saveButton)
+    await waitFor(() => expect((window as any).baduk.saveFile).toHaveBeenCalledWith(
+      '/games/example.sgf',
+      expect.stringContaining('GM[1]')
+    ))
+    await waitFor(() => expect(isDirty.value).toBe(false))
+  })
+
+  it('falls back to Save As when there is no known file path yet', async () => {
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      saveFile: vi.fn(),
+      saveFileAs: vi.fn().mockResolvedValue({ path: '/games/chosen.sgf' })
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    loadGame('(;GM[1]FF[4]SZ[9];B[ee])')
+    isDirty.value = true
+
+    fireEvent.click(getByText('Сохранить'))
+    await waitFor(() =>
+      expect((window as any).baduk.saveFileAs).toHaveBeenCalledWith(undefined, expect.any(String))
+    )
+    await waitFor(() => expect(currentFilePath.value).toBe('/games/chosen.sgf'))
+    expect((window as any).baduk.saveFile).not.toHaveBeenCalled()
+  })
+
+  it('shows an error banner and keeps isDirty true when saving fails', async () => {
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      saveFile: vi.fn().mockRejectedValue(new Error('disk full')),
+      saveFileAs: vi.fn()
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    loadGame('(;GM[1]FF[4]SZ[9];B[ee])', '/games/example.sgf')
+    isDirty.value = true
+
+    fireEvent.click(getByText('Сохранить'))
+    await waitFor(() => expect(getByText(/disk full/)).toBeTruthy())
+    expect(isDirty.value).toBe(true)
   })
 })
