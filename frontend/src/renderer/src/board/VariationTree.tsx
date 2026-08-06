@@ -65,6 +65,13 @@ export function VariationTree(): JSX.Element {
     </div>
   )
 
+  function hasAnnotation(node: NodeObject): boolean {
+    if (node.data.C?.[0]) return true
+    return (['TR', 'SQ', 'CR', 'MA', 'LB'] as const).some(
+      (key) => (node.data[key]?.length ?? 0) > 0
+    )
+  }
+
   function renderMarker(node: NodeObject): JSX.Element {
     const isCurrent = node.id === nodeId
     const colorClass = node.data.B
@@ -82,7 +89,13 @@ export function VariationTree(): JSX.Element {
         onClick={() => (currentNodeId.value = node.id)}
         title={label}
         aria-label={label}
-      />
+      >
+        {hasAnnotation(node) && (
+          <svg class="variation-tree__marker-annotation-icon" viewBox="0 0 1 1" aria-hidden="true">
+            <path d="M 0 .5 L .6 .5 L .3 0 z" transform="translate(.2 .2)" />
+          </svg>
+        )}
+      </button>
     )
   }
 

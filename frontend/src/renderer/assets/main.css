@@ -321,6 +321,7 @@ code {
   height: 14px;
   margin: 3px 0;
   padding: 0;
+  position: relative;
   border-radius: 50%;
   border: 1px solid #666;
   cursor: pointer;
@@ -342,6 +343,15 @@ code {
 .variation-tree__marker--current {
   outline: 2px solid #4dabf7;
   outline-offset: 1px;
+}
+.variation-tree__marker-annotation-icon {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 8px;
+  height: 8px;
+  fill: var(--color-accent, #22C55E);
+  pointer-events: none;
 }
 
 .winrate-chart {
