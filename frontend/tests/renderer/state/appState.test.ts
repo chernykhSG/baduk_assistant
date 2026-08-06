@@ -6,7 +6,10 @@ import {
   analysisByTurn,
   currentBoardPosition,
   currentTurnNumber,
-  currentMoveAnalysis
+  currentMoveAnalysis,
+  currentFilePath,
+  isDirty,
+  currentNode
 } from '@renderer/state/appState'
 
 const fixtureContent = '(;GM[1]FF[4]SZ[9]KM[7.5]RU[Chinese];B[ee])'
@@ -76,5 +79,39 @@ describe('currentTurnNumber + currentMoveAnalysis', () => {
 
     currentNodeId.value = mainLineVariation.id
     expect(currentMoveAnalysis.value).toEqual(fakeResponse)
+  })
+})
+
+describe('currentFilePath + isDirty', () => {
+  it('default to null and false', () => {
+    expect(currentFilePath.value).toBeNull()
+    expect(isDirty.value).toBe(false)
+  })
+
+  it('can be set independently of the tree/node signals', () => {
+    currentFilePath.value = 'C:/games/example.sgf'
+    isDirty.value = true
+
+    expect(currentFilePath.value).toBe('C:/games/example.sgf')
+    expect(isDirty.value).toBe(true)
+
+    currentFilePath.value = null
+    isDirty.value = false
+  })
+})
+
+describe('currentNode', () => {
+  it('is null when no tree is loaded', () => {
+    expect(currentNode.value).toBeNull()
+  })
+
+  it('derives the raw node object for the current node id', () => {
+    const tree = parseSgf(fixtureContent)
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+
+    expect(currentNode.value?.id).toBe(leaf.id)
+    expect(currentNode.value?.data.B).toEqual(['ee'])
   })
 })
