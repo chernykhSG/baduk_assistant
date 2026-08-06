@@ -2,12 +2,15 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/preact'
 import { BoardView } from '@renderer/board/BoardView'
 import { currentTree, currentNodeId, analysisByTurn } from '@renderer/state/appState'
+import { selectedAnnotationTool, labelTextOverride } from '@renderer/state/annotationToolState'
 import { parseSgf, findMainLineLeaf } from '@renderer/board/sgfLoader'
 
 afterEach(() => {
   currentTree.value = null
   currentNodeId.value = null
   analysisByTurn.value = new Map()
+  selectedAnnotationTool.value = null
+  labelTextOverride.value = null
 })
 
 describe('BoardView', () => {
@@ -156,5 +159,75 @@ describe('BoardView', () => {
     // since its only candidate vertex is occupied by the user's own markup.
     expect(markers.some((el) => el.textContent === 'A')).toBe(true)
     expect(markers.some((el) => el.textContent === '1')).toBe(false)
+  })
+
+  it('places a triangle at the clicked vertex when the triangle tool is selected', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+    selectedAnnotationTool.value = 'TR'
+
+    const { container } = render(<BoardView />)
+    const vertex = container.querySelector('[data-x="2"][data-y="2"]')
+    fireEvent.click(vertex as Element)
+
+    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.TR).toEqual([
+      'cc'
+    ])
+  })
+
+  it('places the pending label text and then resets the override for the next placement', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+    selectedAnnotationTool.value = 'LB'
+    labelTextOverride.value = 'Z'
+
+    const { container } = render(<BoardView />)
+    const vertex = container.querySelector('[data-x="0"][data-y="0"]')
+    fireEvent.click(vertex as Element)
+
+    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.LB).toEqual([
+      'aa:Z'
+    ])
+    expect(labelTextOverride.value).toBeNull()
+  })
+
+  it('erases markup at the clicked vertex when the eraser tool is selected', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee]MA[cc])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+    selectedAnnotationTool.value = 'erase'
+
+    const { container } = render(<BoardView />)
+    const vertex = container.querySelector('[data-x="2"][data-y="2"]')
+    fireEvent.click(vertex as Element)
+
+    expect(
+      (currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.MA
+    ).toBeUndefined()
+  })
+
+  it('does nothing when no annotation tool is selected', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+
+    const { container } = render(<BoardView />)
+    const vertex = container.querySelector('[data-x="2"][data-y="2"]')
+    fireEvent.click(vertex as Element)
+
+    expect((currentTree.value!.get(leaf.id) as { data: Record<string, string[]> }).data.TR).toBeUndefined()
+  })
+
+  it('renders one button per annotation tool in the toolbar', () => {
+    const { container } = render(<BoardView />)
+    const buttons = container.querySelectorAll('.board-view__annotation-toolbar button')
+    // Triangle, square, circle, cross, label, eraser
+    expect(buttons.length).toBe(6)
   })
 })

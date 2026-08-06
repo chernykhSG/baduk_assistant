@@ -245,6 +245,29 @@ code {
   align-items: center;
   justify-content: center;
 }
+.board-view__annotation-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.board-view__annotation-tool {
+  background: none;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--ev-c-text-2, #888);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.board-view__annotation-tool--active {
+  color: var(--ev-c-text-1, #fff);
+  border-color: var(--ev-c-text-2, #888);
+}
+.board-view__label-input {
+  width: 3em;
+}
 
 .variation-tree {
   display: flex;
