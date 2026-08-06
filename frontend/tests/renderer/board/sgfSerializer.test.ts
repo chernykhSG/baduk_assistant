@@ -31,4 +31,12 @@ describe('serializeTree', () => {
     expect(reparsedLeaf.data.LB).toEqual(['ee:A'])
     expect(reparsedLeaf.data.C).toEqual(['Хороший ход'])
   })
+
+  it('produces well-formed SGF starting with opening parenthesis', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9]KM[7.5];B[ee];W[ec])')
+
+    const text = serializeTree(tree)
+
+    expect(text.trimStart()).toMatch(/^\(/)
+  })
 })
