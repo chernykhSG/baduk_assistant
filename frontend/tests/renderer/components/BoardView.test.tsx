@@ -116,4 +116,45 @@ describe('BoardView', () => {
     const { container } = render(<BoardView />)
     expect(container.querySelector('.shudan-marker')).toBeTruthy()
   })
+
+  it('renders existing figure and label markup from the SGF node', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee]TR[gg]LB[cc:A])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+
+    const { container } = render(<BoardView />)
+
+    const markers = Array.from(container.querySelectorAll('.shudan-marker'))
+    expect(markers.some((el) => el.querySelector('path'))).toBe(true) // triangle renders as an svg <path>
+    expect(markers.some((el) => el.textContent === 'A')).toBe(true)
+  })
+
+  it('lets user markup take priority over a PV candidate label at the same vertex', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee]LB[cc:A])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+    analysisByTurn.value = new Map([
+      [
+        1,
+        {
+          id: 'x',
+          // 'cc' (sgf) -> vertex [2,2] -> GTP 'C7' on a 9x9 board (row = 9 - 2 = 7)
+          moveInfos: [
+            { move: 'C7', winrate: 0.6, scoreLead: 1, visits: 100, prior: 0.5, pv: ['C7'] }
+          ],
+          rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 }
+        }
+      ]
+    ])
+
+    const { container } = render(<BoardView />)
+
+    const markers = Array.from(container.querySelectorAll('.shudan-marker'))
+    // The user's label 'A' wins; the PV rank label '1' must not appear at all,
+    // since its only candidate vertex is occupied by the user's own markup.
+    expect(markers.some((el) => el.textContent === 'A')).toBe(true)
+    expect(markers.some((el) => el.textContent === '1')).toBe(false)
+  })
 })

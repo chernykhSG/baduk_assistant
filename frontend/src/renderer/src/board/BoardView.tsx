@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { BoundedGoban } from '@sabaki/shudan'
 import '@sabaki/shudan/css/goban.css'
-import { currentBoardPosition, currentMoveAnalysis } from '../state/appState'
+import { currentBoardPosition, currentMoveAnalysis, currentNode } from '../state/appState'
 import { GTP_COLUMNS } from './gtpColumns'
+import { buildAnnotationMarkerMap, emptyMarkerGrid } from './annotations'
 import type { JSX } from 'preact'
+import type { Marker } from '@sabaki/shudan'
 import type { MoveInfo } from '../ipc/client'
 
 const MAX_SUGGESTED_MOVES = 5
@@ -45,27 +47,23 @@ function useContainerSize(): [
   return [setRef, size]
 }
 
-type BoardMarker = { type: 'point' } | { type: 'label'; label: string }
-
 function buildMarkerMap(
   lastMoveVertex: [number, number] | null,
   suggestedMoves: MoveInfo[] | undefined,
-  boardSize: number
-): (null | BoardMarker)[][] | undefined {
-  if (!lastMoveVertex && !suggestedMoves?.length) return undefined
-  const grid: (null | BoardMarker)[][] = []
-  for (let y = 0; y < boardSize; y++) {
-    grid.push(new Array(boardSize).fill(null))
-  }
-  if (lastMoveVertex) {
+  boardSize: number,
+  userMarkerMap: (Marker | null)[][]
+): (Marker | null)[][] {
+  // Start from a copy of the user's own markup (figures/labels from the SGF
+  // node) — it belongs to the position and always wins. KataGo-derived
+  // overlays below only fill vertices the user hasn't already marked.
+  const grid = userMarkerMap.map((row) => [...row])
+
+  if (lastMoveVertex && !grid[lastMoveVertex[1]][lastMoveVertex[0]]) {
     grid[lastMoveVertex[1]][lastMoveVertex[0]] = { type: 'point' }
   }
-  // Candidate moves take priority over the last-move marker — they only ever
-  // land on empty vertices, so there's no real overlap, but rank numbers are
-  // the more useful thing to see if one ever did coincide.
   suggestedMoves?.slice(0, MAX_SUGGESTED_MOVES).forEach((info, index) => {
     const vertex = gtpToVertex(info.move, boardSize)
-    if (!vertex) return
+    if (!vertex || grid[vertex[1]][vertex[0]]) return
     grid[vertex[1]][vertex[0]] = { type: 'label', label: String(index + 1) }
   })
   return grid
@@ -114,10 +112,15 @@ export function BoardView(): JSX.Element {
   const heatMap = showOwnership
     ? ownershipToHeatMap(analysis?.ownership, position.boardSize, hoveredVertex)
     : undefined
+  const node = currentNode.value
+  const userMarkerMap = node
+    ? buildAnnotationMarkerMap(node, position.boardSize)
+    : emptyMarkerGrid(position.boardSize)
   const markerMap = buildMarkerMap(
     position.lastMoveVertex,
     showPv ? analysis?.moveInfos : undefined,
-    position.boardSize
+    position.boardSize,
+    userMarkerMap
   )
 
   // Before the first ResizeObserver callback (or in test environments, where
