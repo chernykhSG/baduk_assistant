@@ -21,7 +21,9 @@ afterEach(() => {
 describe('App / ConnectionGate', () => {
   it('shows a connection-error screen if the backend connection promise rejects', async () => {
     ;(window as any).baduk = {
-      getBackendConnection: vi.fn().mockRejectedValue(new Error('backend did not start'))
+      getBackendConnection: vi.fn().mockRejectedValue(new Error('backend did not start')),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
     }
 
     const { getByText } = render(<App />)
@@ -33,7 +35,9 @@ describe('App / ConnectionGate', () => {
 
   it('renders the app shell once the backend connection resolves', async () => {
     ;(window as any).baduk = {
-      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' })
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
     }
 
     const { container } = render(<App />)
@@ -47,7 +51,9 @@ describe('App / ConnectionGate', () => {
 describe('loadGame with a rectangular-board SGF', () => {
   it('surfaces an explicit sgfError banner instead of crashing/leaving stale tree state', async () => {
     ;(window as any).baduk = {
-      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' })
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
     }
 
     const { container } = render(<App />)
@@ -78,7 +84,9 @@ describe('loadGame with a rectangular-board SGF', () => {
 describe('save flow', () => {
   it('shows "Без файла" and disables Save/Save As with no game loaded', async () => {
     ;(window as any).baduk = {
-      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' })
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
     }
 
     const { getByText } = render(<App />)
@@ -92,7 +100,9 @@ describe('save flow', () => {
     ;(window as any).baduk = {
       getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
       saveFile: vi.fn().mockResolvedValue(undefined),
-      saveFileAs: vi.fn()
+      saveFileAs: vi.fn(),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
     }
     ;(window as any).electron = {
       webUtils: { getPathForFile: vi.fn().mockReturnValue('/games/example.sgf') }
@@ -120,7 +130,9 @@ describe('save flow', () => {
     ;(window as any).baduk = {
       getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
       saveFile: vi.fn(),
-      saveFileAs: vi.fn().mockResolvedValue({ path: '/games/chosen.sgf' })
+      saveFileAs: vi.fn().mockResolvedValue({ path: '/games/chosen.sgf' }),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
     }
 
     const { getByText } = render(<App />)
@@ -141,7 +153,9 @@ describe('save flow', () => {
     ;(window as any).baduk = {
       getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
       saveFile: vi.fn().mockRejectedValue(new Error('disk full')),
-      saveFileAs: vi.fn()
+      saveFileAs: vi.fn(),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
     }
 
     const { getByText } = render(<App />)
@@ -153,5 +167,52 @@ describe('save flow', () => {
     fireEvent.click(getByText('Сохранить'))
     await waitFor(() => expect(getByText(/disk full/)).toBeTruthy())
     expect(isDirty.value).toBe(true)
+  })
+})
+
+describe('unsaved-changes close handshake', () => {
+  it('reports dirty state to main whenever isDirty changes', async () => {
+    const reportDirtyState = vi.fn()
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      reportDirtyState,
+      onSaveBeforeClose: vi.fn().mockReturnValue(() => {})
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    isDirty.value = true
+    await waitFor(() => expect(reportDirtyState).toHaveBeenLastCalledWith(true))
+
+    isDirty.value = false
+    await waitFor(() => expect(reportDirtyState).toHaveBeenLastCalledWith(false))
+  })
+
+  it('saves and reports success when main requests a save before close', async () => {
+    let saveBeforeCloseHandler: (() => void) | undefined
+    const sendSaveBeforeCloseResult = vi.fn()
+    ;(window as any).baduk = {
+      getBackendConnection: vi.fn().mockResolvedValue({ port: 5555, token: 'test-token' }),
+      saveFile: vi.fn().mockResolvedValue(undefined),
+      reportDirtyState: vi.fn(),
+      onSaveBeforeClose: vi.fn().mockImplementation((handler: () => void) => {
+        saveBeforeCloseHandler = handler
+        return () => {}
+      }),
+      sendSaveBeforeCloseResult
+    }
+
+    const { getByText } = render(<App />)
+    await waitFor(() => expect(getByText(/Без файла/)).toBeTruthy())
+
+    loadGame('(;GM[1]FF[4]SZ[9];B[ee])', '/games/example.sgf')
+    isDirty.value = true
+
+    expect(saveBeforeCloseHandler).toBeTruthy()
+    await saveBeforeCloseHandler!()
+
+    expect((window as any).baduk.saveFile).toHaveBeenCalled()
+    await waitFor(() => expect(sendSaveBeforeCloseResult).toHaveBeenCalledWith(true))
   })
 })

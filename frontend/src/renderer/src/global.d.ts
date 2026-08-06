@@ -11,6 +11,9 @@ declare global {
       getBackendConnection(): Promise<BackendConnection>
       saveFile(path: string, content: string): Promise<void>
       saveFileAs(defaultPath: string | undefined, content: string): Promise<SaveFileAsResult>
+      reportDirtyState(isDirty: boolean): void
+      onSaveBeforeClose(handler: () => void): () => void
+      sendSaveBeforeCloseResult(success: boolean): void
     }
   }
 }

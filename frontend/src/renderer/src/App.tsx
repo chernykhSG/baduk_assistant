@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks'
-import { signal } from '@preact/signals'
+import { signal, useSignalEffect } from '@preact/signals'
 import type { JSX } from 'preact'
 import { BoardView } from './board/BoardView'
 import { VariationTree } from './board/VariationTree'
@@ -132,6 +132,17 @@ export function App(): JSX.Element {
         connectionState.value = 'error'
         connectionErrorMessage.value = err.message
       })
+  }, [])
+
+  useSignalEffect(() => {
+    window.baduk.reportDirtyState(isDirty.value)
+  })
+
+  useEffect(() => {
+    return window.baduk.onSaveBeforeClose(async () => {
+      await saveCurrentGame()
+      window.baduk.sendSaveBeforeCloseResult(!isDirty.value)
+    })
   }, [])
 
   if (connectionState.value === 'pending') {

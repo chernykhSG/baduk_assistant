@@ -40,13 +40,11 @@ vi.mock('node:fs/promises', () => {
 })
 
 vi.mock('electron', () => ({
-  dialog: {
-    showSaveDialog: mockShowSaveDialog
-  }
+  dialog: { showSaveDialog: mockShowSaveDialog, showMessageBoxSync: vi.fn() }
 }))
 
 import { dialog } from 'electron'
-import { saveFile, saveFileAs } from '../../src/main/fileIO'
+import { saveFile, saveFileAs, promptUnsavedChangesChoice } from '../../src/main/fileIO'
 
 beforeEach(() => {
   mockWriteFile.mockReset().mockResolvedValue(undefined)
@@ -98,5 +96,22 @@ describe('saveFileAs', () => {
 
     expect(result).toEqual({ canceled: true })
     expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('promptUnsavedChangesChoice', () => {
+  it('maps dialog button index 0 to save-and-close', () => {
+    vi.mocked(dialog.showMessageBoxSync).mockReturnValue(0)
+    expect(promptUnsavedChangesChoice({} as Electron.BrowserWindow)).toBe('save-and-close')
+  })
+
+  it('maps dialog button index 1 to close-without-saving', () => {
+    vi.mocked(dialog.showMessageBoxSync).mockReturnValue(1)
+    expect(promptUnsavedChangesChoice({} as Electron.BrowserWindow)).toBe('close-without-saving')
+  })
+
+  it('maps dialog button index 2 (and the dismiss/Escape case) to cancel', () => {
+    vi.mocked(dialog.showMessageBoxSync).mockReturnValue(2)
+    expect(promptUnsavedChangesChoice({} as Electron.BrowserWindow)).toBe('cancel')
   })
 })

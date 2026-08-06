@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { startBackend, stopBackend, type BackendConnection } from './backendConnection'
-import { saveFile, saveFileAs } from './fileIO'
+import { saveFile, saveFileAs, promptUnsavedChangesChoice } from './fileIO'
 
 // Opt-in Chrome DevTools Protocol access for debugging sessions that have no
 // interactive devtools available (e.g. driven from a terminal). Must be set
@@ -13,6 +13,8 @@ if (process.env.BADUK_DEBUG_PORT) {
 }
 
 let backendConnectionPromise: Promise<BackendConnection> | null = null
+let mainWindow: BrowserWindow | null = null
+let hasUnsavedChanges = false
 
 function getBackendConnection(): Promise<BackendConnection> {
   if (!backendConnectionPromise) {
@@ -23,7 +25,7 @@ function getBackendConnection(): Promise<BackendConnection> {
 
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -36,11 +38,25 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow!.show()
   })
 
   mainWindow.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
     console.log(`[renderer] ${message} (${sourceId}:${line})`)
+  })
+
+  mainWindow.on('close', (event) => {
+    if (!hasUnsavedChanges) return
+    event.preventDefault()
+
+    const choice = promptUnsavedChangesChoice(mainWindow!)
+    if (choice === 'cancel') return
+    if (choice === 'close-without-saving') {
+      hasUnsavedChanges = false
+      mainWindow!.destroy()
+      return
+    }
+    mainWindow!.webContents.send('file:save-before-close')
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -79,6 +95,14 @@ app.whenReady().then(() => {
   ipcMain.handle('file:save-as', (_event, defaultPath: string | undefined, content: string) =>
     saveFileAs(defaultPath, content)
   )
+  ipcMain.on('file:dirty-changed', (_event, dirty: boolean) => {
+    hasUnsavedChanges = dirty
+  })
+  ipcMain.on('file:save-before-close-result', (_event, success: boolean) => {
+    if (!success) return
+    hasUnsavedChanges = false
+    mainWindow?.destroy()
+  })
 
   createWindow()
 
