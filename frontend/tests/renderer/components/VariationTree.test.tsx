@@ -49,8 +49,10 @@ describe('VariationTree', () => {
 
     const { container } = render(<VariationTree />)
 
-    const icon = container.querySelector('.variation-tree__marker-annotation-icon')
-    expect(icon).not.toBeNull()
+    expect(container.querySelectorAll('.variation-tree__marker-annotation-icon').length).toBe(1)
+    expect(
+      container.querySelector('[aria-label="B ee"] .variation-tree__marker-annotation-icon')
+    ).not.toBeNull()
   })
 
   it('shows the annotation indicator on a node with markup', () => {
@@ -60,8 +62,22 @@ describe('VariationTree', () => {
 
     const { container } = render(<VariationTree />)
 
-    const icon = container.querySelector('.variation-tree__marker-annotation-icon')
-    expect(icon).not.toBeNull()
+    expect(container.querySelectorAll('.variation-tree__marker-annotation-icon').length).toBe(1)
+    expect(
+      container.querySelector('[aria-label="B ee"] .variation-tree__marker-annotation-icon')
+    ).not.toBeNull()
+  })
+
+  it('shows the annotation indicator on the root node', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9]C[game comment];B[ee])')
+    currentTree.value = tree
+    currentNodeId.value = tree.root.id
+
+    const { container } = render(<VariationTree />)
+
+    expect(
+      container.querySelector('[aria-label="root"] .variation-tree__marker-annotation-icon')
+    ).not.toBeNull()
   })
 
   it('does not show the annotation indicator on a node with neither comment nor markup', () => {

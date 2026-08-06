@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'preact/hooks'
 import type { ComponentChild, JSX } from 'preact'
 import { currentTree, currentNodeId } from '../state/appState'
 import type { NodeObject } from './sgfLoader'
+import { FIGURE_PROPERTIES } from './annotations'
 
 function stepDown(): void {
   const tree = currentTree.value
@@ -67,9 +68,7 @@ export function VariationTree(): JSX.Element {
 
   function hasAnnotation(node: NodeObject): boolean {
     if (node.data.C?.[0]) return true
-    return (['TR', 'SQ', 'CR', 'MA', 'LB'] as const).some(
-      (key) => (node.data[key]?.length ?? 0) > 0
-    )
+    return ([...FIGURE_PROPERTIES, 'LB'] as const).some((key) => (node.data[key]?.length ?? 0) > 0)
   }
 
   function renderMarker(node: NodeObject): JSX.Element {

@@ -6,7 +6,7 @@ import { sgfCoordToVertex } from './boardPosition'
 export type FigureProperty = 'TR' | 'SQ' | 'CR' | 'MA'
 export type AnnotationTool = FigureProperty | 'LB' | 'erase'
 
-const FIGURE_PROPERTIES: FigureProperty[] = ['TR', 'SQ', 'CR', 'MA']
+export const FIGURE_PROPERTIES: FigureProperty[] = ['TR', 'SQ', 'CR', 'MA']
 
 const FIGURE_TO_MARKER_TYPE: Record<FigureProperty, Marker['type']> = {
   TR: 'triangle',
