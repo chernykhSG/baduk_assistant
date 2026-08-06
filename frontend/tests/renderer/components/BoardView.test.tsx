@@ -225,6 +225,11 @@ describe('BoardView', () => {
   })
 
   it('renders one button per annotation tool in the toolbar', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee])')
+    const leaf = findMainLineLeaf(tree)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+
     const { container } = render(<BoardView />)
     const buttons = container.querySelectorAll('.board-view__annotation-toolbar button')
     // Triangle, square, circle, cross, label, eraser
