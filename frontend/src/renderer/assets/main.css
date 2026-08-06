@@ -374,3 +374,19 @@ code {
   margin-top: 8px;
   white-space: pre-wrap;
 }
+.annotation-panel {
+  padding: 8px;
+}
+.annotation-panel__comment {
+  width: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--color-surface, #0e1223);
+  color: var(--ev-c-text-1, #fff);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  padding: 6px;
+}

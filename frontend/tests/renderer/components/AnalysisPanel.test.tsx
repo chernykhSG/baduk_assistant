@@ -8,6 +8,9 @@ vi.mock('@renderer/analysis/WinrateChart', () => ({
 vi.mock('@renderer/analysis/LlmExplanationPanel', () => ({
   LlmExplanationPanel: () => <div data-testid="llm-panel" />
 }))
+vi.mock('@renderer/analysis/AnnotationPanel', () => ({
+  AnnotationPanel: () => <div class="annotation-panel" />
+}))
 
 describe('AnalysisPanel', () => {
   it('shows the KataGo tab by default', () => {
@@ -21,5 +24,11 @@ describe('AnalysisPanel', () => {
     fireEvent.click(getByText('LLM'))
     expect(getByTestId('llm-panel')).toBeTruthy()
     expect(queryByTestId('winrate-chart')).toBeNull()
+  })
+
+  it('shows an Разметка tab that renders the AnnotationPanel', () => {
+    const { getByText, container } = render(<AnalysisPanel />)
+    fireEvent.click(getByText('Разметка'))
+    expect(container.querySelector('.annotation-panel')).toBeTruthy()
   })
 })
