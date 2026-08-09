@@ -11,6 +11,7 @@ from baduk_backend.api import analysis, explain
 from baduk_backend.auth import AUTH_TOKEN, require_valid_token
 from baduk_backend.config.profile import KataGoProfile, render_analysis_config
 from baduk_backend.engine_manager import EngineManager, build_katago_command
+from baduk_backend.llm.orchestrator import LLMProvider
 
 app = FastAPI()
 app.include_router(analysis.router)
@@ -63,21 +64,40 @@ def _build_engine_manager() -> tuple[EngineManager, str]:
     return EngineManager(command), config_path
 
 
+def _select_llm_provider(provider_name: str) -> LLMProvider:
+    if provider_name == "claude":
+        from baduk_backend.llm.providers.claude import ClaudeProvider
+
+        if not os.environ.get("BADUK_CLAUDE_API_KEY"):
+            raise RuntimeError(
+                "BADUK_CLAUDE_API_KEY env var must be set when BADUK_LLM_PROVIDER=claude"
+            )
+        return ClaudeProvider()
+    elif provider_name == "gemini":
+        from baduk_backend.llm.providers.gemini import GeminiProvider
+
+        if not os.environ.get("BADUK_GEMINI_API_KEY"):
+            raise RuntimeError(
+                "BADUK_GEMINI_API_KEY env var must be set when BADUK_LLM_PROVIDER=gemini "
+                "(or unset BADUK_LLM_PROVIDER)"
+            )
+        return GeminiProvider()
+    else:
+        raise RuntimeError(
+            f"Unknown BADUK_LLM_PROVIDER={provider_name!r}, expected 'claude' or 'gemini'"
+        )
+
+
 def run() -> None:
     import uvicorn
 
-    from baduk_backend.llm.providers.claude import ClaudeProvider
-
-    if not os.environ.get("BADUK_CLAUDE_API_KEY"):
-        raise RuntimeError(
-            "BADUK_CLAUDE_API_KEY env var must be set to use the /api/explain endpoint"
-        )
+    llm_provider = _select_llm_provider(os.environ.get("BADUK_LLM_PROVIDER", "gemini"))
 
     engine_manager, config_path = _build_engine_manager()
     try:
         app.state.engine_manager = engine_manager
         app.state.engine_lock = asyncio.Lock()
-        app.state.llm_provider = ClaudeProvider()
+        app.state.llm_provider = llm_provider
 
         port = _find_free_port()
         print(build_startup_message(port, AUTH_TOKEN), flush=True)
