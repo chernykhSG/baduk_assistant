@@ -17,9 +17,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd backend
 .venv\Scripts\python.exe -m pytest -v              # юнит-тесты (integration-маркер исключён по умолчанию)
 .venv\Scripts\python.exe -m pytest -v -m integration  # реальный KataGo — требует BADUK_KATAGO_BINARY/BADUK_KATAGO_MODEL
-                                                       # (тот же прогон также содержит два теста реальных LLM API — Claude требует BADUK_CLAUDE_API_KEY, Gemini — BADUK_GEMINI_API_KEY, каждый самостоятельно скипается без своего ключа)
+                                                       # (тот же прогон также содержит три теста реальных LLM API — Claude требует BADUK_CLAUDE_API_KEY, Gemini — BADUK_GEMINI_API_KEY, llama-cpp-python — BADUK_LLAMA_MODEL_PATH, каждый самостоятельно скипается без своего требования)
 ```
-Backend-сервис (`run()` в `main.py`) при старте требует `BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` плюс API-ключ активного LLM-провайдера (fail-fast, `RuntimeError` без него) — используется эндпоинтом `/api/explain`. Провайдер выбирается через `BADUK_LLM_PROVIDER` (`"claude"` или `"gemini"`, по умолчанию `"gemini"`, если переменная не задана): для `claude` требуется `BADUK_CLAUDE_API_KEY` (опционально `BADUK_CLAUDE_MODEL` переопределяет модель), для `gemini` — `BADUK_GEMINI_API_KEY` (опционально `BADUK_GEMINI_MODEL`).
+Backend-сервис (`run()` в `main.py`) при старте требует `BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` плюс конфигурацию активного LLM-провайдера (fail-fast, `RuntimeError` без неё) — используется эндпоинтом `/api/explain`. Провайдер выбирается через `BADUK_LLM_PROVIDER` (`"claude"`, `"gemini"` или `"llama"`, по умолчанию `"llama"`, если переменная не задана): для `claude` требуется `BADUK_CLAUDE_API_KEY` (опционально `BADUK_CLAUDE_MODEL` переопределяет модель), для `gemini` — `BADUK_GEMINI_API_KEY` (опционально `BADUK_GEMINI_MODEL`), для `llama` — `BADUK_LLAMA_MODEL_PATH` (опционально `BADUK_LLAMA_N_GPU_LAYERS`).
 
 **Frontend** (`frontend/`, Electron+TS+Preact, `pnpm`):
 ```powershell

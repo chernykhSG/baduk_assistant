@@ -99,7 +99,7 @@ def _select_llm_provider(provider_name: str) -> LLMProvider:
 def run() -> None:
     import uvicorn
 
-    llm_provider = _select_llm_provider(os.environ.get("BADUK_LLM_PROVIDER", "gemini"))
+    llm_provider = _select_llm_provider(os.environ.get("BADUK_LLM_PROVIDER", "llama"))
 
     engine_manager, config_path = _build_engine_manager()
     try:

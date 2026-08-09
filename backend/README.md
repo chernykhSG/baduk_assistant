@@ -97,7 +97,7 @@ for whichever LLM provider is active — it fails fast at startup if either
 is missing, since `/api/explain` calls that provider.
 
 `BADUK_LLM_PROVIDER` selects the active provider: `"claude"`, `"gemini"`,
-or `"llama"` (defaults to `"gemini"` if unset). Depending on the value:
+or `"llama"` (defaults to `"llama"` if unset). Depending on the value:
 - `claude` — requires `BADUK_CLAUDE_API_KEY`. `BADUK_CLAUDE_MODEL` is
   optional and overrides the default model.
 - `gemini` — requires `BADUK_GEMINI_API_KEY`. `BADUK_GEMINI_MODEL` is
