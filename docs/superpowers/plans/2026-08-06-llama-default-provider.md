@@ -74,7 +74,7 @@ or `"llama"` (defaults to `"gemini"` if unset). Depending on the value:
 ```markdown
 .venv\Scripts\python.exe -m pytest -v -m integration  # реальный KataGo — требует BADUK_KATAGO_BINARY/BADUK_KATAGO_MODEL
                                                        # (тот же прогон также содержит два теста реальных LLM API — Claude требует BADUK_CLAUDE_API_KEY, Gemini — BADUK_GEMINI_API_KEY, каждый самостоятельно скипается без своего ключа)
-```
+
 Backend-сервис (`run()` в `main.py`) при старте требует `BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` плюс API-ключ активного LLM-провайдера (fail-fast, `RuntimeError` без него) — используется эндпоинтом `/api/explain`. Провайдер выбирается через `BADUK_LLM_PROVIDER` (`"claude"` или `"gemini"`, по умолчанию `"gemini"`, если переменная не задана): для `claude` требуется `BADUK_CLAUDE_API_KEY` (опционально `BADUK_CLAUDE_MODEL` переопределяет модель), для `gemini` — `BADUK_GEMINI_API_KEY` (опционально `BADUK_GEMINI_MODEL`).
 ```
 
