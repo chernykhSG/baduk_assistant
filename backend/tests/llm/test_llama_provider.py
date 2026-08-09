@@ -1,6 +1,9 @@
 import json
+import threading
 
 import pytest
+
+pytest.importorskip("llama_cpp")
 
 from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
 from baduk_backend.feature_extraction.schemas import Finding
@@ -158,3 +161,24 @@ def test_llama_provider_reads_n_gpu_layers_override(monkeypatch):
     LlamaProvider()
 
     assert captured["n_gpu_layers"] == 20
+
+
+def test_llama_provider_raises_clear_error_for_invalid_n_gpu_layers(monkeypatch):
+    class _FakeLlamaClass:
+        def __init__(self, **kwargs):
+            pass
+
+    monkeypatch.setattr("llama_cpp.Llama", _FakeLlamaClass)
+    monkeypatch.setenv("BADUK_LLAMA_MODEL_PATH", "/path/to/model.gguf")
+    monkeypatch.setenv("BADUK_LLAMA_N_GPU_LAYERS", "not-a-number")
+
+    with pytest.raises(ValueError, match="BADUK_LLAMA_N_GPU_LAYERS"):
+        LlamaProvider()
+
+
+def test_llama_provider_has_a_lock_guarding_the_shared_llama_instance():
+    response = _json_response("ok", [])
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    assert isinstance(provider._lock, type(threading.Lock()))

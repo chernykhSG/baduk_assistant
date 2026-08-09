@@ -12,8 +12,10 @@ dependencies = [
     "uvicorn[standard]>=0.52.1",
     "anthropic>=0.40.0",
     "google-genai>=1.0.0",
-    "llama-cpp-python>=0.3.34",
 ]
+
+[project.optional-dependencies]
+llama = ["llama-cpp-python>=0.3.34"]
 
 [project.scripts]
 baduk-backend = "baduk_backend:run"

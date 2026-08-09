@@ -53,11 +53,20 @@ This provider runs a GGUF-format model locally via `llama-cpp-python`,
 avoiding cloud API costs and rate limits, at the cost of needing a
 compatible GPU and a heavier install than the cloud providers.
 
-**Recommended model:** `Qwen3-8B-Instruct`, `Q4_K_M` quantization (~5 GB) —
+**Recommended model:** `Qwen3-8B`, `Q4_K_M` quantization (~5 GB) —
 strong Russian-language quality, fits comfortably in 8 GB VRAM. Download
 `Qwen3-8B-Q4_K_M.gguf` from `unsloth/Qwen3-8B-GGUF` on Hugging Face and
 place it anywhere on disk — the exact location is up to you, set it via
 `BADUK_LLAMA_MODEL_PATH` (see below).
+
+**VRAM note:** the model loads into VRAM once at backend startup and stays
+there for the whole session — on the same GPU that also runs KataGo. If
+you're running both on a single ≤8GB card, budget VRAM carefully (lower
+`BADUK_LLAMA_N_GPU_LAYERS` from the `-1` default to offload fewer layers if
+you hit out-of-memory errors — note that the OOM may surface confusingly as
+a *KataGo* startup failure, since KataGo initializes second). Expect backend
+startup to take tens of seconds longer than with the cloud providers while
+the model loads.
 
 **Installing `llama-cpp-python` with CUDA support (NVIDIA GPUs):** the
 primary route is a prebuilt CUDA wheel:

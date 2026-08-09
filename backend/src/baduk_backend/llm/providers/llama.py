@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 
 import llama_cpp
 from pydantic import ValidationError
@@ -18,12 +19,24 @@ DEFAULT_MAX_TOKENS = 2048
 
 class LlamaProvider:
     def __init__(self, llm: llama_cpp.Llama | None = None):
-        self._llm = llm or llama_cpp.Llama(
-            model_path=os.environ["BADUK_LLAMA_MODEL_PATH"],
-            n_gpu_layers=int(os.environ.get("BADUK_LLAMA_N_GPU_LAYERS", DEFAULT_N_GPU_LAYERS)),
-            n_ctx=DEFAULT_N_CTX,
-            verbose=False,
-        )
+        if llm is not None:
+            self._llm = llm
+        else:
+            n_gpu_layers_raw = os.environ.get("BADUK_LLAMA_N_GPU_LAYERS", str(DEFAULT_N_GPU_LAYERS))
+            try:
+                n_gpu_layers = int(n_gpu_layers_raw)
+            except ValueError as exc:
+                raise ValueError(
+                    f"BADUK_LLAMA_N_GPU_LAYERS must be an integer, got {n_gpu_layers_raw!r}"
+                ) from exc
+
+            self._llm = llama_cpp.Llama(
+                model_path=os.environ["BADUK_LLAMA_MODEL_PATH"],
+                n_gpu_layers=n_gpu_layers,
+                n_ctx=DEFAULT_N_CTX,
+                verbose=False,
+            )
+        self._lock = threading.Lock()
 
     def complete(
         self,
@@ -36,18 +49,25 @@ class LlamaProvider:
         if corrections:
             user_content += "\n\nИсправь предыдущий ответ:\n" + "\n".join(corrections)
 
-        response = self._llm.create_chat_completion(
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            response_format={"type": "json_object", "schema": EXPLANATION_TOOL_PARAMETERS},
-            max_tokens=DEFAULT_MAX_TOKENS,
-        )
+        with self._lock:
+            response = self._llm.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_content},
+                ],
+                response_format={"type": "json_object", "schema": EXPLANATION_TOOL_PARAMETERS},
+                max_tokens=DEFAULT_MAX_TOKENS,
+            )
+        finish_reason = response["choices"][0].get("finish_reason")
         content = response["choices"][0]["message"]["content"]
         if not content:
-            raise RuntimeError("Llama did not produce structured output")
+            raise RuntimeError(
+                f"Llama did not produce structured output (finish_reason={finish_reason!r})"
+            )
         try:
             return Explanation.model_validate(json.loads(content))
         except (json.JSONDecodeError, ValidationError) as exc:
-            raise RuntimeError("Llama did not produce valid structured output") from exc
+            raise RuntimeError(
+                f"Llama did not produce valid structured output "
+                f"(finish_reason={finish_reason!r}, content={content[:200]!r})"
+            ) from exc

@@ -92,6 +92,8 @@ def test_select_llm_provider_llama_requires_model_path(monkeypatch):
 
 
 def test_select_llm_provider_llama_builds_llama_provider(monkeypatch):
+    pytest.importorskip("llama_cpp")
+
     from baduk_backend.main import _select_llm_provider
 
     monkeypatch.setattr("llama_cpp.Llama", lambda **kwargs: object())
