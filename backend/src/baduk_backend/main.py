@@ -82,9 +82,17 @@ def _select_llm_provider(provider_name: str) -> LLMProvider:
                 "(or unset BADUK_LLM_PROVIDER)"
             )
         return GeminiProvider()
+    elif provider_name == "llama":
+        from baduk_backend.llm.providers.llama import LlamaProvider
+
+        if not os.environ.get("BADUK_LLAMA_MODEL_PATH"):
+            raise RuntimeError(
+                "BADUK_LLAMA_MODEL_PATH env var must be set when BADUK_LLM_PROVIDER=llama"
+            )
+        return LlamaProvider()
     else:
         raise RuntimeError(
-            f"Unknown BADUK_LLM_PROVIDER={provider_name!r}, expected 'claude' or 'gemini'"
+            f"Unknown BADUK_LLM_PROVIDER={provider_name!r}, expected 'claude', 'gemini', or 'llama'"
         )
 
 

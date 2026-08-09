@@ -80,3 +80,25 @@ def test_select_llm_provider_rejects_unknown_value():
 
     with pytest.raises(RuntimeError, match="Unknown BADUK_LLM_PROVIDER"):
         _select_llm_provider("not-a-real-provider")
+
+
+def test_select_llm_provider_llama_requires_model_path(monkeypatch):
+    monkeypatch.delenv("BADUK_LLAMA_MODEL_PATH", raising=False)
+
+    from baduk_backend.main import _select_llm_provider
+
+    with pytest.raises(RuntimeError, match="BADUK_LLAMA_MODEL_PATH"):
+        _select_llm_provider("llama")
+
+
+def test_select_llm_provider_llama_builds_llama_provider(monkeypatch):
+    from baduk_backend.main import _select_llm_provider
+
+    monkeypatch.setattr("llama_cpp.Llama", lambda **kwargs: object())
+    monkeypatch.setenv("BADUK_LLAMA_MODEL_PATH", "/path/to/model.gguf")
+
+    from baduk_backend.llm.providers.llama import LlamaProvider
+
+    provider = _select_llm_provider("llama")
+
+    assert isinstance(provider, LlamaProvider)

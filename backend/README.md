@@ -37,28 +37,66 @@ uv run pytest -v -m integration
 ## Running the real LLM provider integration tests
 
 `tests/test_api_explain_integration.py` (also gated by `-m integration`) calls
-the real Claude and/or Gemini APIs. Each test self-skips if its provider's
-API key isn't set:
+the real Claude and/or Gemini APIs, or runs real local inference via
+`llama-cpp-python`. Each test self-skips if its provider isn't configured:
 
 ```powershell
 $env:BADUK_CLAUDE_API_KEY = "sk-ant-..."
 $env:BADUK_GEMINI_API_KEY = "AIzaSy..."
+$env:BADUK_LLAMA_MODEL_PATH = "C:/models/Qwen3-8B-Q4_K_M.gguf"
 uv run pytest -v -m integration
 ```
+
+## Setting up the local llama-cpp-python provider (optional)
+
+This provider runs a GGUF-format model locally via `llama-cpp-python`,
+avoiding cloud API costs and rate limits, at the cost of needing a
+compatible GPU and a heavier install than the cloud providers.
+
+**Recommended model:** `Qwen3-8B-Instruct`, `Q4_K_M` quantization (~5 GB) —
+strong Russian-language quality, fits comfortably in 8 GB VRAM. Download
+`Qwen3-8B-Q4_K_M.gguf` from `unsloth/Qwen3-8B-GGUF` on Hugging Face and
+place it anywhere on disk — the exact location is up to you, set it via
+`BADUK_LLAMA_MODEL_PATH` (see below).
+
+**Installing `llama-cpp-python` with CUDA support (NVIDIA GPUs):** the
+primary route is a prebuilt CUDA wheel:
+
+```powershell
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+```
+
+Replace `cu124` with whichever CUDA version matches your installed CUDA
+Toolkit (check with `nvidia-smi`) — `cu118`, `cu121`, `cu122`, `cu123`,
+`cu124`, `cu125`, `cu130`, and `cu132` are available.
+
+If no prebuilt wheel matches your platform/Python version, `pip` falls back
+to building from source. On Windows this can fail with a long-path error
+(`OSError: [Errno 2] No such file or directory` under a path containing
+`vendor/llama.cpp/...`) — if you hit this, enable Windows Long Path support
+first (registry/group-policy steps are printed in the error itself, or see
+`https://pip.pypa.io/warnings/enable-long-paths`), then retry. A source
+build also requires the NVIDIA CUDA Toolkit and Visual Studio Build Tools
+("Desktop development with C++" workload), with `CMAKE_ARGS="-DGGML_CUDA=on"`
+and `FORCE_CMAKE=1` set before running `pip install llama-cpp-python`.
 
 ## Running the backend service
 
 `baduk-backend` (the `run()` entry point in `main.py`) requires
-`BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` (see above) plus an API key for
-whichever LLM provider is active — it fails fast at startup if either is
-missing, since `/api/explain` calls that provider's API.
+`BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` (see above) plus configuration
+for whichever LLM provider is active — it fails fast at startup if either
+is missing, since `/api/explain` calls that provider.
 
-`BADUK_LLM_PROVIDER` selects the active provider: `"claude"` or `"gemini"`
-(defaults to `"gemini"` if unset). Depending on the value:
+`BADUK_LLM_PROVIDER` selects the active provider: `"claude"`, `"gemini"`,
+or `"llama"` (defaults to `"gemini"` if unset). Depending on the value:
 - `claude` — requires `BADUK_CLAUDE_API_KEY`. `BADUK_CLAUDE_MODEL` is
   optional and overrides the default model.
 - `gemini` — requires `BADUK_GEMINI_API_KEY`. `BADUK_GEMINI_MODEL` is
   optional and overrides the default model.
+- `llama` — requires `BADUK_LLAMA_MODEL_PATH` (absolute path to a `.gguf`
+  model file — see "Setting up the local llama-cpp-python provider" above).
+  `BADUK_LLAMA_N_GPU_LAYERS` is optional (defaults to `-1`, offloading all
+  layers to GPU) — lower it if the model doesn't fit in your VRAM.
 
 Any other `BADUK_LLM_PROVIDER` value fails fast at startup with an error
 naming the invalid value.
@@ -72,6 +110,7 @@ naming the invalid value.
   ходам (`StreamAnalyzeRequest` на входе, `progress`/`done`/`error` сообщения
   на выходе). Неверный/отсутствующий токен → закрытие соединения кодом `1008`.
 - `POST /api/explain` — LLM-объяснение находки (`weak_group`) через активный
-  провайдер (`BADUK_LLM_PROVIDER` — `claude` или `gemini`). Тело запроса и
-  ответ — см. `ExplainRequest`/`ExplainResponse` в том же файле. Требует
-  заголовок `X-Auth-Token`. `503`, если вызов провайдера завершился ошибкой.
+  провайдер (`BADUK_LLM_PROVIDER` — `claude`, `gemini` или `llama`). Тело
+  запроса и ответ — см. `ExplainRequest`/`ExplainResponse` в том же файле.
+  Требует заголовок `X-Auth-Token`. `503`, если вызов провайдера завершился
+  ошибкой.
