@@ -78,7 +78,7 @@ def test_gemini_provider_forces_function_call_with_any_mode():
     assert config.tool_config.function_calling_config.allowed_function_names == [
         "record_explanation"
     ]
-    assert config.thinking_config.thinking_budget == 0
+    assert config.thinking_config.thinking_level == "MINIMAL"
 
 
 def test_gemini_provider_prompt_uses_gtp_coords_and_color_not_raw_json():
@@ -129,6 +129,16 @@ def test_gemini_provider_appends_corrections_to_prompt():
 
 def test_gemini_provider_raises_if_function_not_called():
     response = SimpleNamespace(function_calls=None)
+    client = _FakeClient(response)
+    provider = GeminiProvider(client=client, model="gemini-test")
+
+    with pytest.raises(RuntimeError, match="did not call"):
+        provider.complete(_finding(), _analysis(), board_size=9)
+
+
+def test_gemini_provider_raises_if_matched_call_has_no_args():
+    call = SimpleNamespace(name="record_explanation", args=None)
+    response = SimpleNamespace(function_calls=[call])
     client = _FakeClient(response)
     provider = GeminiProvider(client=client, model="gemini-test")
 

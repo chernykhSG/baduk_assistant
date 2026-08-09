@@ -53,10 +53,10 @@ class GeminiProvider:
                         mode="ANY", allowed_function_names=[EXPLANATION_TOOL_NAME]
                     )
                 ),
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=types.ThinkingConfig(thinking_level="MINIMAL"),
             ),
         )
         for call in response.function_calls or []:
-            if call.name == EXPLANATION_TOOL_NAME:
+            if call.name == EXPLANATION_TOOL_NAME and call.args:
                 return Explanation.model_validate(call.args)
         raise RuntimeError("Gemini did not call record_explanation")

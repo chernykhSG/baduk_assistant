@@ -17,9 +17,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd backend
 .venv\Scripts\python.exe -m pytest -v              # юнит-тесты (integration-маркер исключён по умолчанию)
 .venv\Scripts\python.exe -m pytest -v -m integration  # реальный KataGo — требует BADUK_KATAGO_BINARY/BADUK_KATAGO_MODEL
-                                                       # (тот же прогон также содержит тест реального Claude API — требует BADUK_CLAUDE_API_KEY, самостоятельно скипается без него)
+                                                       # (тот же прогон также содержит два теста реальных LLM API — Claude требует BADUK_CLAUDE_API_KEY, Gemini — BADUK_GEMINI_API_KEY, каждый самостоятельно скипается без своего ключа)
 ```
-Backend-сервис (`run()` в `main.py`) при старте требует `BADUK_CLAUDE_API_KEY` (fail-fast, `RuntimeError` без него) — используется эндпоинтом `/api/explain`. `BADUK_CLAUDE_MODEL` опционален и переопределяет модель по умолчанию для этого эндпоинта.
+Backend-сервис (`run()` в `main.py`) при старте требует `BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL` плюс API-ключ активного LLM-провайдера (fail-fast, `RuntimeError` без него) — используется эндпоинтом `/api/explain`. Провайдер выбирается через `BADUK_LLM_PROVIDER` (`"claude"` или `"gemini"`, по умолчанию `"gemini"`, если переменная не задана): для `claude` требуется `BADUK_CLAUDE_API_KEY` (опционально `BADUK_CLAUDE_MODEL` переопределяет модель), для `gemini` — `BADUK_GEMINI_API_KEY` (опционально `BADUK_GEMINI_MODEL`).
 
 **Frontend** (`frontend/`, Electron+TS+Preact, `pnpm`):
 ```powershell
