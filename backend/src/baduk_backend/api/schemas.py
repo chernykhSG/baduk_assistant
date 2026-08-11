@@ -68,6 +68,8 @@ class ExplainRequest(BaseModel):
     boardXSize: int = Field(ge=2, le=25)
     boardYSize: int = Field(ge=2, le=25)
     analysis: AnalyzeResponse
+    analysisAfter: AnalyzeResponse | None = None
+    nextMove: tuple[str, str] | None = None
 
     @model_validator(mode="after")
     def _ownership_matches_board_size(self) -> "ExplainRequest":
@@ -77,6 +79,12 @@ class ExplainRequest(BaseModel):
                 "analysis.ownership length must equal boardXSize * boardYSize "
                 f"({self.boardXSize * self.boardYSize}), got {len(ownership)}"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _analysis_after_and_next_move_together(self) -> "ExplainRequest":
+        if (self.analysisAfter is None) != (self.nextMove is None):
+            raise ValueError("analysisAfter and nextMove must both be set or both be None")
         return self
 
 

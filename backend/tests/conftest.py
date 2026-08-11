@@ -67,14 +67,18 @@ def slow_fake_engine_app():
 
 class _StubLLMProvider:
     def complete(self, finding, analysis, board_size, corrections=None):
+        if finding.type == "weak_group":
+            cited_field, cited_number = "weak_score", finding.weak_score
+        else:
+            cited_field, cited_number = "delta_score", finding.delta_score
         return Explanation(
             summary="Тестовое объяснение",
             claims=[
                 Claim(
                     text="...",
                     finding_id=finding.finding_id,
-                    cited_field="weak_score",
-                    cited_number=finding.weak_score,
+                    cited_field=cited_field,
+                    cited_number=cited_number,
                 )
             ],
         )

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from baduk_backend.api.schemas import ExplainRequest, ExplainResponse
 from baduk_backend.auth import require_valid_token
 from baduk_backend.board.board_state import apply_moves
+from baduk_backend.feature_extraction.mistake import detect_mistake
 from baduk_backend.feature_extraction.weak_group import detect_weak_group
 from baduk_backend.llm.consistency import verify_and_retry
 from baduk_backend.llm.orchestrator import LLMProvider
@@ -27,8 +28,16 @@ async def explain(
 ) -> ExplainResponse:
     turn_number = body.analysis.turnNumber if body.analysis.turnNumber is not None else len(body.moves)
     board = apply_moves(body.moves, body.boardXSize, body.boardYSize)
-    finding = detect_weak_group(board, body.boardXSize, body.boardYSize, body.analysis, turn_number)
+    weak_finding = detect_weak_group(board, body.boardXSize, body.boardYSize, body.analysis, turn_number)
 
+    mistake_finding = None
+    if body.analysisAfter is not None and body.nextMove is not None:
+        mistake_finding = detect_mistake(
+            board, body.analysis, body.analysisAfter, body.nextMove,
+            body.boardXSize, body.boardYSize, turn_number,
+        )
+
+    finding = mistake_finding or weak_finding
     if finding is None:
         return ExplainResponse(message="Ничего заметного не найдено в этой позиции")
 
