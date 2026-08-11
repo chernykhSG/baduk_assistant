@@ -173,6 +173,7 @@ export interface Claim {
     | 'own_certainty'
     | 'boundary_certainty'
     | 'liberties'
+    | 'delta_score'
     | 'visits'
     | 'winrate'
     | 'scoreLead'
