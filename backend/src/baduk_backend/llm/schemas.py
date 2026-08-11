@@ -3,7 +3,14 @@ from typing import Literal
 from pydantic import BaseModel
 
 CitedField = Literal[
-    "weak_score", "own_certainty", "boundary_certainty", "liberties", "visits", "winrate", "scoreLead"
+    "weak_score",
+    "own_certainty",
+    "boundary_certainty",
+    "liberties",
+    "delta_score",
+    "visits",
+    "winrate",
+    "scoreLead",
 ]
 
 

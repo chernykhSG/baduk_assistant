@@ -1,5 +1,5 @@
 from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
-from baduk_backend.feature_extraction.schemas import WeakGroupFinding
+from baduk_backend.feature_extraction.schemas import Finding, MistakeFinding, WeakGroupFinding
 from baduk_backend.llm.consistency import verify_and_retry
 from baduk_backend.llm.schemas import Claim, Explanation
 
@@ -27,6 +27,19 @@ def _finding() -> WeakGroupFinding:
         liberties=4,
         severity="high",
         confidence=0.5,
+    )
+
+
+def _mistake_finding() -> Finding:
+    return MistakeFinding(
+        finding_id="f_test",
+        turn_number=5,
+        color="W",
+        move="Q4",
+        delta_score=3.0,
+        stage="middlegame",
+        severity="medium",
+        confidence=0.6,
     )
 
 
@@ -143,3 +156,49 @@ def test_verify_and_retry_falls_back_when_claims_stay_empty_after_retries():
 
     assert verified is False
     assert result.claims == []
+
+
+def test_verify_and_retry_accepts_correct_mistake_claims():
+    explanation = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=3.0)],
+    )
+    provider = _RecordingFakeProvider([explanation])
+
+    result, verified = verify_and_retry(provider, _mistake_finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == explanation
+
+
+def test_verify_and_retry_rejects_wrong_mistake_claim_then_retries():
+    bad = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=0.1)],
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=3.0)],
+    )
+    provider = _RecordingFakeProvider([bad, good])
+
+    result, verified = verify_and_retry(provider, _mistake_finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert "delta_score" in provider.calls[1][0]
+
+
+def test_verify_and_retry_falls_back_with_mistake_specific_summary():
+    bad = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=0.1)],
+    )
+    provider = _RecordingFakeProvider([bad, bad, bad])
+
+    result, verified = verify_and_retry(provider, _mistake_finding(), _analysis(), 9)
+
+    assert verified is False
+    assert result.claims == []
+    assert "3.00" in result.summary
+    assert "Δ" in result.summary

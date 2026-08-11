@@ -6,7 +6,10 @@ from baduk_backend.llm.schemas import Claim, Explanation
 MAX_CONSISTENCY_RETRIES = 2
 FLOAT_TOLERANCE = 0.01
 
-_FINDING_FIELDS = {"weak_score", "own_certainty", "boundary_certainty", "liberties"}
+_FINDING_FIELDS: dict[str, set[str]] = {
+    "weak_group": {"weak_score", "own_certainty", "boundary_certainty", "liberties"},
+    "mistake": {"delta_score"},
+}
 
 _EMPTY_CLAIMS_CORRECTION = (
     "Твой ответ не содержит ни одного утверждения (claims), ссылающегося на конкретное число. "
@@ -15,7 +18,7 @@ _EMPTY_CLAIMS_CORRECTION = (
 
 
 def _true_value(field: str, finding: Finding, analysis: AnalyzeResponse) -> float:
-    if field in _FINDING_FIELDS:
+    if field in _FINDING_FIELDS[finding.type]:
         return getattr(finding, field)
     return getattr(analysis.rootInfo, field)
 
@@ -47,15 +50,21 @@ def _correction_message(claim: Claim, finding: Finding, analysis: AnalyzeRespons
 
 
 def _fallback_explanation(finding: Finding) -> Explanation:
-    return Explanation(
-        summary=(
+    if finding.type == "weak_group":
+        summary = (
             f"Обнаружена слабая группа (ход {finding.turn_number}): "
             f"показатель уязвимости {finding.weak_score:.2f}, уверенность {finding.confidence:.2f}. "
             "Не удалось получить проверенное текстовое объяснение - "
             "эти числа стоит свериться с ходами-кандидатами вручную."
-        ),
-        claims=[],
-    )
+        )
+    else:
+        summary = (
+            f"Обнаружена потеря очков на ходе {finding.turn_number}: "
+            f"Δ={finding.delta_score:.2f}, уверенность {finding.confidence:.2f}. "
+            "Не удалось получить проверенное текстовое объяснение - "
+            "эти числа стоит свериться с ходами-кандидатами вручную."
+        )
+    return Explanation(summary=summary, claims=[])
 
 
 def _is_verified(explanation: Explanation, finding: Finding, analysis: AnalyzeResponse) -> bool:
