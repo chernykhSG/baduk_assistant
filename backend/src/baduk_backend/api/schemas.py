@@ -69,7 +69,7 @@ class ExplainRequest(BaseModel):
     boardYSize: int = Field(ge=2, le=25)
     analysis: AnalyzeResponse
     analysisAfter: AnalyzeResponse | None = None
-    nextMove: tuple[str, str] | None = None
+    nextMove: tuple[Literal["B", "W"], str] | None = None
 
     @model_validator(mode="after")
     def _ownership_matches_board_size(self) -> "ExplainRequest":

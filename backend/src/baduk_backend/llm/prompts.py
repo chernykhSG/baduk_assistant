@@ -16,7 +16,7 @@ record_explanation - никогда не выдумывай новые числ�
 """
 
 EXPLANATION_TOOL_NAME = "record_explanation"
-EXPLANATION_TOOL_DESCRIPTION = "Записывает структурированное объяснение слабой группы для игрока."
+EXPLANATION_TOOL_DESCRIPTION = "Записывает структурированное объяснение находки для игрока."
 EXPLANATION_TOOL_PARAMETERS = {
     "type": "object",
     "properties": {
@@ -73,5 +73,7 @@ def build_user_prompt(finding: Finding, analysis: AnalyzeResponse, board_size: i
         f"Находка о ходе {color_ru} (finding_id={finding.finding_id}):\n"
         f"Сыгранный ход: {finding.move} (ход №{finding.turn_number}, стадия: {finding.stage})\n"
         f"delta_score={finding.delta_score}, confidence={finding.confidence}\n"
+        "(scoreLead и winrate - всегда с точки зрения чёрных; delta_score - потеря очков "
+        "для игрока, сделавшего ход)\n"
         f"{root}"
     )

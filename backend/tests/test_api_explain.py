@@ -83,6 +83,10 @@ def test_explain_returns_mistake_finding_when_only_mistake_triggers(explain_clie
     assert body["finding"]["type"] == "mistake"
     assert body["finding"]["delta_score"] == 3.0
     assert body["verified"] is True
+    # The played move is one move further than the analyzed position
+    # (payload's analysis.turnNumber = 1 here), so the mistake's turn_number
+    # in the response must be turnNumber + 1 = 2, not 1.
+    assert body["finding"]["turn_number"] == 2
 
 
 def test_explain_prefers_mistake_when_both_detectors_trigger(explain_client):
@@ -105,6 +109,24 @@ def test_explain_prefers_mistake_when_both_detectors_trigger(explain_client):
     )
     assert response.status_code == 200
     assert response.json()["finding"]["type"] == "mistake"
+
+
+def test_explain_returns_422_when_next_move_color_is_lowercase(explain_client):
+    response = explain_client.post(
+        "/api/explain",
+        headers={"X-Auth-Token": AUTH_TOKEN},
+        json=_payload(
+            analysis_after={
+                "id": "y",
+                "turnNumber": 2,
+                "moveInfos": [],
+                "rootInfo": {"winrate": 0.2, "scoreLead": 3.0, "visits": 250},
+                "ownership": None,
+            },
+            next_move=["b", "F5"],
+        ),
+    )
+    assert response.status_code == 422
 
 
 def test_explain_returns_422_when_analysis_after_given_without_next_move(explain_client):

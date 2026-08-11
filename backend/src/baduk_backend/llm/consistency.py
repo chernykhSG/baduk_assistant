@@ -17,16 +17,18 @@ _EMPTY_CLAIMS_CORRECTION = (
 )
 
 
-def _true_value(field: str, finding: Finding, analysis: AnalyzeResponse) -> float:
+def _true_value(field: str, finding: Finding, analysis: AnalyzeResponse) -> float | None:
     if field in _FINDING_FIELDS[finding.type]:
         return getattr(finding, field)
-    return getattr(analysis.rootInfo, field)
+    return getattr(analysis.rootInfo, field, None)
 
 
 def _claim_matches(claim: Claim, finding: Finding, analysis: AnalyzeResponse) -> bool:
     if claim.finding_id != finding.finding_id:
         return False
     true_value = _true_value(claim.cited_field, finding, analysis)
+    if true_value is None:
+        return False
     if claim.cited_field in ("liberties", "visits"):
         return int(claim.cited_number) == int(true_value)
     return abs(claim.cited_number - true_value) <= FLOAT_TOLERANCE
@@ -43,6 +45,11 @@ def _correction_message(claim: Claim, finding: Finding, analysis: AnalyzeRespons
             f'ссылаться на текущую находку с finding_id="{finding.finding_id}". Исправь finding_id.'
         )
     true_value = _true_value(claim.cited_field, finding, analysis)
+    if true_value is None:
+        return (
+            f'Поле "{claim.cited_field}" не относится к находке типа "{finding.type}" - '
+            "убери это утверждение или сошлись на подходящем поле из переданных данных."
+        )
     return (
         f'Ты сослался на число {claim.cited_number} для поля "{claim.cited_field}", '
         f"но настоящее значение - {true_value}. Используй точное число или убери это утверждение."

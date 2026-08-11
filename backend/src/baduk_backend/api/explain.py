@@ -34,7 +34,7 @@ async def explain(
     if body.analysisAfter is not None and body.nextMove is not None:
         mistake_finding = detect_mistake(
             board, body.analysis, body.analysisAfter, body.nextMove,
-            body.boardXSize, body.boardYSize, turn_number,
+            body.boardXSize, body.boardYSize, turn_number + 1,
         )
 
     finding = mistake_finding or weak_finding

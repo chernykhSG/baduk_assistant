@@ -202,3 +202,51 @@ def test_verify_and_retry_falls_back_with_mistake_specific_summary():
     assert result.claims == []
     assert "3.00" in result.summary
     assert "Δ" in result.summary
+
+
+def test_verify_and_retry_does_not_crash_on_cross_type_field_weak_group_finding():
+    # delta_score belongs to MistakeFinding, not WeakGroupFinding, and is not
+    # a rootInfo attribute either - citing it against a weak_group finding
+    # must be treated as a mismatch (retry), never raise AttributeError.
+    cross_type = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=3.0)],
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+    )
+    provider = _RecordingFakeProvider([cross_type, good])
+
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert provider.calls[0] is None
+    assert provider.calls[1] is not None
+    assert "delta_score" in provider.calls[1][0]
+    assert "не относится" in provider.calls[1][0]
+
+
+def test_verify_and_retry_does_not_crash_on_cross_type_field_mistake_finding():
+    # weak_score belongs to WeakGroupFinding, not MistakeFinding, and is not
+    # a rootInfo attribute either - citing it against a mistake finding must
+    # be treated as a mismatch (retry), never raise AttributeError.
+    cross_type = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=3.0)],
+    )
+    provider = _RecordingFakeProvider([cross_type, good])
+
+    result, verified = verify_and_retry(provider, _mistake_finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert provider.calls[0] is None
+    assert provider.calls[1] is not None
+    assert "weak_score" in provider.calls[1][0]
+    assert "не относится" in provider.calls[1][0]
