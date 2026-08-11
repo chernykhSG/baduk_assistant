@@ -9,3 +9,11 @@ class ParsedCard(BaseModel):
     title: str
     source: str
     body: str
+
+
+class RagSnippet(BaseModel):
+    doc_id: str
+    title: str
+    source: str
+    text_snippet: str
+    relevance_score: float
