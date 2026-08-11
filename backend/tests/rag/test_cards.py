@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from baduk_backend.rag.cards import parse_card_file
+pytest.importorskip("yaml")
+
+from baduk_backend.rag.cards import parse_card_file  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -34,3 +36,8 @@ def test_parse_card_file_raises_on_missing_frontmatter_field():
 def test_parse_card_file_raises_on_missing_title():
     with pytest.raises(ValueError, match="Title"):
         parse_card_file(FIXTURES / "missing_title.md", FIXTURES)
+
+
+def test_parse_card_file_raises_on_missing_frontmatter_block():
+    with pytest.raises(ValueError, match="frontmatter"):
+        parse_card_file(FIXTURES / "no_frontmatter.md", FIXTURES)

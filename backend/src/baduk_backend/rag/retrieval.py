@@ -6,6 +6,7 @@ from baduk_backend.rag.store import (
     DEFAULT_STORE_PATH,
     get_chroma_client,
     get_embedding_model,
+    to_float_vectors,
 )
 
 
@@ -22,17 +23,18 @@ def retrieve_knowledge(
         )
 
     client = get_chroma_client(store_path)
+    from chromadb.errors import NotFoundError
+
     try:
         collection = client.get_collection(name=COLLECTION_NAME)
-    except Exception as exc:
+    except NotFoundError as exc:
         raise RuntimeError(
             f"RAG collection '{COLLECTION_NAME}' not found in {store_path} - run ingestion first: "
             "python -m baduk_backend.rag.ingest"
         ) from exc
 
     model = embedding_model or get_embedding_model()
-    # Same float-coercion note as ingest.py's run_ingest() - see there for why.
-    query_embedding = [[float(x) for x in vector] for vector in model.encode([query])]
+    query_embedding = to_float_vectors(model.encode([query]))
 
     results = collection.query(query_embeddings=query_embedding, n_results=top_k)
 

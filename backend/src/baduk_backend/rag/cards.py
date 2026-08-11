@@ -16,6 +16,8 @@ def parse_card_file(path: Path, wiki_root: Path) -> ParsedCard:
         raise ValueError(f"malformed card {path}: no YAML frontmatter block found")
 
     frontmatter = yaml.safe_load(match.group(1)) or {}
+    if not isinstance(frontmatter, dict):
+        raise ValueError(f"malformed card {path}: frontmatter did not parse to a mapping")
     body = match.group(2).strip()
 
     for field in ("type", "category", "status"):

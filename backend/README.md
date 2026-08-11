@@ -129,6 +129,35 @@ or `"llama"` (defaults to `"llama"` if unset). Depending on the value:
 Any other `BADUK_LLM_PROVIDER` value fails fast at startup with an error
 naming the invalid value.
 
+## Running the RAG knowledge-base ingestion pipeline (optional)
+
+This builds the Chroma vector store (`backend/rag_store/`) that
+`baduk_backend.rag.retrieval.retrieve_knowledge()` queries. It requires the
+`rag` optional-dependency group (`pyyaml`, `sentence-transformers`,
+`chromadb`):
+
+```powershell
+.venv\Scripts\python.exe -m pip install -e ".[rag]"
+```
+
+Set `BADUK_KNOWLEDGE_BASE_PATH` to point at the root of a local checkout of
+the `Baduk-knowledge-base` repo (a separate repo holding the markdown cards
+under `knowledge-base/wiki/{principles,mistakes,exercises}/*.md`):
+
+```powershell
+$env:BADUK_KNOWLEDGE_BASE_PATH = "C:/path/to/your/Baduk-knowledge-base/checkout"
+```
+
+Then run ingestion from within `backend/`:
+
+```powershell
+.venv\Scripts\python.exe -m baduk_backend.rag.ingest
+```
+
+This is a manual, on-demand script — the backend service does not run it
+automatically — and every run does a full rebuild of `backend/rag_store/`
+(it is not incremental).
+
 ## API
 
 - `POST /api/analyze` — анализ одной позиции. Тело запроса и ответ — см.

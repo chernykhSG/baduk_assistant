@@ -23,9 +23,9 @@ def test_retrieve_knowledge_returns_snippets_from_store(tmp_path):
 
     snippets = retrieve_knowledge("запрос", top_k=2, store_path=store_path, embedding_model=fake)
 
-    assert len(snippets) <= 2
+    assert len(snippets) == 2
     doc_ids = {s.doc_id for s in snippets}
-    assert doc_ids <= {"valid_principle", "valid_exercise"}
+    assert doc_ids == {"valid_principle", "valid_exercise"}
     for snippet in snippets:
         assert isinstance(snippet.relevance_score, float)
         assert snippet.text_snippet  # full body, non-empty
