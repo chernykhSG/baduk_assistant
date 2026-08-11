@@ -10,11 +10,11 @@ def test_explain_with_real_claude_api():
         pytest.skip("BADUK_CLAUDE_API_KEY not set")
 
     from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
-    from baduk_backend.feature_extraction.schemas import Finding
+    from baduk_backend.feature_extraction.schemas import WeakGroupFinding
     from baduk_backend.llm.providers.claude import ClaudeProvider
 
     provider = ClaudeProvider()
-    finding = Finding(
+    finding = WeakGroupFinding(
         finding_id="f_test",
         type="weak_group",
         turn_number=10,
@@ -45,11 +45,11 @@ def test_explain_with_real_gemini_api():
         pytest.skip("BADUK_GEMINI_API_KEY not set")
 
     from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
-    from baduk_backend.feature_extraction.schemas import Finding
+    from baduk_backend.feature_extraction.schemas import WeakGroupFinding
     from baduk_backend.llm.providers.gemini import GeminiProvider
 
     provider = GeminiProvider()
-    finding = Finding(
+    finding = WeakGroupFinding(
         finding_id="f_test",
         type="weak_group",
         turn_number=10,
@@ -80,11 +80,11 @@ def test_explain_with_real_llama():
         pytest.skip("BADUK_LLAMA_MODEL_PATH not set")
 
     from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
-    from baduk_backend.feature_extraction.schemas import Finding
+    from baduk_backend.feature_extraction.schemas import WeakGroupFinding
     from baduk_backend.llm.providers.llama import LlamaProvider
 
     provider = LlamaProvider()
-    finding = Finding(
+    finding = WeakGroupFinding(
         finding_id="f_test",
         type="weak_group",
         turn_number=10,
