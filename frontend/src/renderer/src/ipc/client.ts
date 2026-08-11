@@ -137,7 +137,7 @@ export function streamAnalysis(
   }
 }
 
-export interface Finding {
+export interface WeakGroupFinding {
   finding_id: string
   type: 'weak_group'
   turn_number: number
@@ -150,6 +150,20 @@ export interface Finding {
   severity: 'low' | 'medium' | 'high'
   confidence: number
 }
+
+export interface MistakeFinding {
+  finding_id: string
+  type: 'mistake'
+  turn_number: number
+  color: 'B' | 'W'
+  move: string
+  delta_score: number
+  stage: 'opening' | 'middlegame' | 'endgame'
+  severity: 'low' | 'medium' | 'high'
+  confidence: number
+}
+
+export type Finding = WeakGroupFinding | MistakeFinding
 
 export interface Claim {
   text: string
@@ -175,6 +189,8 @@ export interface ExplainRequest {
   boardXSize: number
   boardYSize: number
   analysis: AnalyzeResponse
+  analysisAfter?: AnalyzeResponse
+  nextMove?: [string, string]
 }
 
 export interface ExplainResponse {

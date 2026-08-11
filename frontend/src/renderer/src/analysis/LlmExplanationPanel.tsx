@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'preact/hooks'
 import type { JSX } from 'preact'
-import { currentTree, currentNodeId, currentMoveAnalysis } from '../state/appState'
+import { currentTree, currentNodeId, currentMoveAnalysis, analysisByTurn } from '../state/appState'
 import { getBoardSize } from '../board/sgfLoader'
-import { gtpMoves } from '../board/gameRequestBuilder'
+import type { NodeObject } from '../board/sgfLoader'
+import { gtpMoves, sgfCoordToGtp } from '../board/gameRequestBuilder'
 import { explainPosition } from '../ipc/client'
 import type { ExplainResponse } from '../ipc/client'
 
@@ -37,11 +38,28 @@ export function LlmExplanationPanel(): JSX.Element {
     try {
       const boardSize = getBoardSize(tree)
       const moves = gtpMoves(tree, requestedNodeId, boardSize)
+
+      const node = tree.get(requestedNodeId) as NodeObject
+      const child = node.children[0] as NodeObject | undefined
+      let analysisAfter: typeof analysis | undefined
+      let nextMove: [string, string] | undefined
+      if (child) {
+        const childAnalysis = analysisByTurn.value.get(child.id)
+        const color = child.data.B ? 'B' : child.data.W ? 'W' : null
+        const sgfCoord = child.data.B?.[0] ?? child.data.W?.[0] ?? null
+        if (childAnalysis && color) {
+          analysisAfter = childAnalysis
+          nextMove = [color, sgfCoordToGtp(sgfCoord, boardSize)]
+        }
+      }
+
       const response = await explainPosition({
         moves,
         boardXSize: boardSize,
         boardYSize: boardSize,
-        analysis
+        analysis,
+        analysisAfter,
+        nextMove
       })
       if (currentNodeId.value !== requestedNodeId) return
       setResult(response)

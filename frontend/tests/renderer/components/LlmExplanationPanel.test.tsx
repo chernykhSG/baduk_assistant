@@ -228,4 +228,67 @@ describe('LlmExplanationPanel', () => {
     expect(queryByText('Объяснение для позиции A (устарело)')).toBeNull()
     expect((getByText('Объяснить эту позицию') as HTMLButtonElement).disabled).toBe(false)
   })
+
+  it('includes analysisAfter and nextMove when the current node has a main-line child', async () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee];W[gg])')
+    const [, nodeA, nodeB] = mainLineNodeIds(tree)
+    currentTree.value = tree
+    currentNodeId.value = nodeA
+    const analysisA = {
+      id: 'a',
+      moveInfos: [],
+      rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 },
+      ownership: new Array(81).fill(0)
+    }
+    const analysisB = {
+      id: 'b',
+      moveInfos: [],
+      rootInfo: { winrate: 0.4, scoreLead: -1, visits: 100 },
+      ownership: new Array(81).fill(0)
+    }
+    analysisByTurn.value = new Map([
+      [nodeA, analysisA],
+      [nodeB, analysisB]
+    ])
+    mockExplainPosition.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'ok', claims: [] },
+      verified: true,
+      message: null
+    })
+
+    const { getByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Объяснить эту позицию'))
+
+    await waitFor(() => {
+      expect(mockExplainPosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          analysisAfter: analysisB,
+          nextMove: ['W', 'G3']
+        })
+      )
+    })
+  })
+
+  it('omits analysisAfter and nextMove when the current node is the last move', async () => {
+    loadPosition()
+    mockExplainPosition.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'ok', claims: [] },
+      verified: true,
+      message: null
+    })
+
+    const { getByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Объяснить эту позицию'))
+
+    await waitFor(() => {
+      expect(mockExplainPosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          analysisAfter: undefined,
+          nextMove: undefined
+        })
+      )
+    })
+  })
 })
