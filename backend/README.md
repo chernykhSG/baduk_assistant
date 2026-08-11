@@ -89,6 +89,25 @@ build also requires the NVIDIA CUDA Toolkit and Visual Studio Build Tools
 ("Desktop development with C++" workload), with `CMAKE_ARGS="-DGGML_CUDA=on"`
 and `FORCE_CMAKE=1` set before running `pip install llama-cpp-python`.
 
+**Installing `llama-cpp-python` with Vulkan support (no CUDA Toolkit
+needed):** if the CUDA wheel fails to load — the `Llama(...)` constructor
+raises a DLL-load error, which typically means the machine has the NVIDIA
+driver but not the separate CUDA Toolkit — a prebuilt Vulkan wheel is a
+working alternative:
+
+```powershell
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/vulkan
+```
+
+Vulkan only needs the GPU driver's own Vulkan runtime (`vulkan-1.dll` on
+Windows, installed automatically with any modern GPU driver), not the CUDA
+Toolkit. Verified in this project (2026-08-11, RTX 5060 Ti, no CUDA
+Toolkit installed): with the default `n_gpu_layers=-1`, the load log showed
+`load_tensors: offloaded 37/37 layers to GPU` on device `Vulkan1`, and
+`nvidia-smi` confirmed real usage during inference (VRAM rising to ~5.4 GB,
+GPU utilization up to 95%) at ~30 tokens/sec — versus ~2 tokens/sec (123s
+for a comparable response) on the CPU-only wheel.
+
 ## Running the backend service
 
 `baduk-backend` (the `run()` entry point in `main.py`) requires
