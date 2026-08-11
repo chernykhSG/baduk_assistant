@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 llama = ["llama-cpp-python>=0.3.34"]
+rag = ["pyyaml>=6.0"]
 
 [project.scripts]
 baduk-backend = "baduk_backend:run"
