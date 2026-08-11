@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -45,7 +46,27 @@ def test_run_ingest_is_a_full_rebuild(tmp_path):
     store_path = tmp_path / "rag_store"
     fake = _FakeEmbeddingModel()
 
-    first = run_ingest(knowledge_base_path=KB_ROOT, store_path=store_path, embedding_model=fake)
-    second = run_ingest(knowledge_base_path=KB_ROOT, store_path=store_path, embedding_model=fake)
+    # Work on a private copy of the fixture tree so we can delete a source
+    # card without mutating the shared fixtures/kb_root/ that other tests read.
+    source_root = tmp_path / "kb_root"
+    shutil.copytree(KB_ROOT, source_root)
 
-    assert first == second == 2  # re-running does not duplicate entries
+    first = run_ingest(knowledge_base_path=source_root, store_path=store_path, embedding_model=fake)
+    assert first == 2  # principle + exercise are reviewed; mistake is draft, excluded
+
+    (source_root / "knowledge-base" / "wiki" / "exercises" / "valid_exercise.md").unlink()
+
+    second = run_ingest(knowledge_base_path=source_root, store_path=store_path, embedding_model=fake)
+    assert second == 1  # only the principle remains in the source tree
+
+    client = get_chroma_client(store_path)
+    collection = client.get_collection(name=COLLECTION_NAME)
+
+    # The removed card must be gone from the store too - proves the collection
+    # was rebuilt from scratch, not upserted in place (an upsert-in-place
+    # implementation would still have it lingering from the first run).
+    got_removed = collection.get(ids=["valid_exercise"])
+    assert got_removed["ids"] == []
+
+    got_remaining = collection.get(ids=["valid_principle"])
+    assert got_remaining["ids"] == ["valid_principle"]

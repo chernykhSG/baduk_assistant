@@ -35,9 +35,11 @@ def run_ingest(
     embeddings = [[float(x) for x in vector] for vector in raw_embeddings]
 
     client = get_chroma_client(store_path)
+    from chromadb.errors import NotFoundError
+
     try:
         client.delete_collection(name=COLLECTION_NAME)
-    except Exception:
+    except NotFoundError:
         pass
     collection = client.create_collection(
         name=COLLECTION_NAME,
