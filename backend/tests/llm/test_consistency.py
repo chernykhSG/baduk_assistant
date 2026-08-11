@@ -1,5 +1,5 @@
 from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
-from baduk_backend.feature_extraction.schemas import Finding
+from baduk_backend.feature_extraction.schemas import WeakGroupFinding
 from baduk_backend.llm.consistency import verify_and_retry
 from baduk_backend.llm.schemas import Claim, Explanation
 
@@ -14,8 +14,8 @@ class _RecordingFakeProvider:
         return self._responses.pop(0)
 
 
-def _finding() -> Finding:
-    return Finding(
+def _finding() -> WeakGroupFinding:
+    return WeakGroupFinding(
         finding_id="f_test",
         type="weak_group",
         turn_number=5,

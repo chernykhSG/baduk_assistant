@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
-from baduk_backend.feature_extraction.schemas import Finding
+from baduk_backend.feature_extraction.schemas import WeakGroupFinding
 from baduk_backend.llm.providers.claude import ClaudeProvider
 
 
@@ -29,8 +29,8 @@ def _tool_use_response(summary: str, claims: list[dict]):
     return SimpleNamespace(content=[block])
 
 
-def _finding() -> Finding:
-    return Finding(
+def _finding() -> WeakGroupFinding:
+    return WeakGroupFinding(
         finding_id="f_1",
         type="weak_group",
         turn_number=1,

@@ -14,7 +14,7 @@ from baduk_backend.feature_extraction.config import (
     W3_PV_FOCUS,
     W4_LIBERTIES,
 )
-from baduk_backend.feature_extraction.schemas import Finding
+from baduk_backend.feature_extraction.schemas import WeakGroupFinding
 
 
 def _own_certainty(group: Group, ownership: list[float], board_x_size: int) -> float:
@@ -92,7 +92,7 @@ def detect_weak_group(
     board_y_size: int,
     analysis: AnalyzeResponse,
     turn_number: int,
-) -> Finding | None:
+) -> WeakGroupFinding | None:
     if analysis.ownership is None:
         return None
 
@@ -110,7 +110,7 @@ def detect_weak_group(
 
     score, group, own_cert, boundary_cert = best
     confidence = min(analysis.rootInfo.visits / MIN_RELIABLE_VISITS, 1.0)
-    return Finding(
+    return WeakGroupFinding(
         finding_id=f"f_{uuid.uuid4().hex[:8]}",
         type="weak_group",
         turn_number=turn_number,

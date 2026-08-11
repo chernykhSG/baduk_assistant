@@ -6,7 +6,7 @@ import pytest
 pytest.importorskip("llama_cpp")
 
 from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
-from baduk_backend.feature_extraction.schemas import Finding
+from baduk_backend.feature_extraction.schemas import WeakGroupFinding
 from baduk_backend.llm.providers.llama import LlamaProvider
 
 
@@ -28,8 +28,8 @@ def _json_response(summary: str, claims: list[dict]):
     return _chat_completion_response(json.dumps({"summary": summary, "claims": claims}))
 
 
-def _finding() -> Finding:
-    return Finding(
+def _finding() -> WeakGroupFinding:
+    return WeakGroupFinding(
         finding_id="f_1",
         type="weak_group",
         turn_number=1,

@@ -1,11 +1,11 @@
-from typing import Literal
+from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-class Finding(BaseModel):
+class WeakGroupFinding(BaseModel):
     finding_id: str
-    type: Literal["weak_group"]
+    type: Literal["weak_group"] = "weak_group"
     turn_number: int
     stones: list[tuple[int, int]]
     color: Literal["B", "W"]
@@ -15,3 +15,18 @@ class Finding(BaseModel):
     liberties: int
     severity: Literal["low", "medium", "high"]
     confidence: float
+
+
+class MistakeFinding(BaseModel):
+    finding_id: str
+    type: Literal["mistake"] = "mistake"
+    turn_number: int
+    color: Literal["B", "W"]
+    move: str
+    delta_score: float
+    stage: Literal["opening", "middlegame", "endgame"]
+    severity: Literal["low", "medium", "high"]
+    confidence: float
+
+
+Finding = Annotated[Union[WeakGroupFinding, MistakeFinding], Field(discriminator="type")]
