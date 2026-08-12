@@ -148,6 +148,27 @@ def test_llama_provider_raises_if_content_is_invalid_json():
         provider.complete(_finding(), _analysis(), board_size=9)
 
 
+def test_llama_provider_raises_with_finish_reason_if_content_fails_schema_validation():
+    # Syntactically valid JSON that fails Explanation's schema validation
+    # (missing the required "claims" field) - this exercises
+    # _validate_explanation's ValidationError branch, which must still
+    # surface finish_reason (e.g. to diagnose truncation by max_tokens)
+    # just like the JSONDecodeError and empty-content branches do.
+    response = {
+        "choices": [
+            {
+                "finish_reason": "length",
+                "message": {"content": json.dumps({"summary": "ok"})},
+            }
+        ]
+    }
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    with pytest.raises(RuntimeError, match="finish_reason='length'"):
+        provider.complete(_finding(), _analysis(), board_size=9)
+
+
 def test_llama_provider_constructs_llama_with_env_config(monkeypatch):
     captured: dict = {}
 

@@ -64,12 +64,13 @@ def _extract_json(choice: dict) -> dict:
         ) from exc
 
 
-def _validate_explanation(data: dict) -> Explanation:
+def _validate_explanation(data: dict, finish_reason: str | None = None) -> Explanation:
     try:
         return Explanation.model_validate(data)
     except ValidationError as exc:
         raise RuntimeError(
-            f"Llama did not produce valid structured output (content={data!r})"
+            f"Llama did not produce valid structured output "
+            f"(finish_reason={finish_reason!r}, content={data!r})"
         ) from exc
 
 
@@ -107,7 +108,7 @@ class LlamaProvider:
 
         if not _rag_available():
             choice = self._call(SYSTEM_PROMPT, user_content, EXPLANATION_TOOL_PARAMETERS)
-            return _validate_explanation(_extract_json(choice))
+            return _validate_explanation(_extract_json(choice), choice.get("finish_reason"))
 
         system_prompt = SYSTEM_PROMPT + "\n" + RAG_SEARCH_INSTRUCTIONS
         decision_choice = self._call(system_prompt, user_content, RAG_DECISION_TOOL_PARAMETERS)
@@ -115,7 +116,7 @@ class LlamaProvider:
 
         if decision.get("tool") != "retrieve_knowledge":
             decision.pop("tool", None)
-            return _validate_explanation(decision)
+            return _validate_explanation(decision, decision_choice.get("finish_reason"))
 
         from baduk_backend.rag.retrieval import retrieve_knowledge
 
@@ -126,7 +127,7 @@ class LlamaProvider:
 
         final_user_content = user_content + "\n\n" + _format_snippets(snippets)
         final_choice = self._call(system_prompt, final_user_content, EXPLANATION_WITH_RAG_TOOL_PARAMETERS)
-        return _validate_explanation(_extract_json(final_choice))
+        return _validate_explanation(_extract_json(final_choice), final_choice.get("finish_reason"))
 
     def _call(self, system_prompt: str, user_content: str, schema: dict) -> dict:
         with self._lock:
