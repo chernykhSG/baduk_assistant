@@ -13,11 +13,11 @@
 Новая функция в `backend/src/baduk_backend/rag/retrieval.py`:
 
 ```python
-def get_snippet_by_id(doc_id: str, store_path: Path = DEFAULT_STORE_PATH, embedding_model=None) -> RagSnippet | None:
+def get_snippet_by_id(doc_id: str, store_path: Path = DEFAULT_STORE_PATH) -> RagSnippet | None:
     ...
 ```
 
-Точечный lookup через `collection.get(ids=[doc_id])` — без эмбеддинга запроса (в отличие от `retrieve_knowledge`, это не семантический поиск, а прямой доступ по ключу, дешевле и точнее). Возвращает `None`, если `doc_id` не найден, store не существует, или коллекция не создана — не бросает исключение ни в одном из этих случаев (в отличие от `retrieve_knowledge`, где отсутствие store — ошибка уровня «запусти ingestion»; здесь отсутствие карточки для конкретного `doc_id` — штатная, не исключительная ситуация: обогащение цитаты — необязательное улучшение ответа, не критичный путь).
+Точечный lookup через `collection.get(ids=[doc_id])` — без эмбеддинга запроса и без параметра `embedding_model` вообще (в отличие от `retrieve_knowledge`, это не семантический поиск, а прямой доступ по ключу — `collection.get()` не считает векторы, дешевле и точнее семантического поиска). Возвращает `None`, если `doc_id` не найден, store не существует, или коллекция не создана — не бросает исключение ни в одном из этих случаев (в отличие от `retrieve_knowledge`, где отсутствие store — ошибка уровня «запусти ingestion»; здесь отсутствие карточки для конкретного `doc_id` — штатная, не исключительная ситуация: обогащение цитаты — необязательное улучшение ответа, не критичный путь).
 
 `backend/src/baduk_backend/api/explain.py` вызывает `get_snippet_by_id` один раз, после `verify_and_retry`, только если `explanation.rag_doc_id is not None`.
 
