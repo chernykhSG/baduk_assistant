@@ -194,11 +194,19 @@ export interface ExplainRequest {
   nextMove?: [string, string]
 }
 
+export interface RagCitation {
+  doc_id: string
+  title: string
+  source: string
+  text_snippet: string
+}
+
 export interface ExplainResponse {
   finding: Finding | null
   explanation: Explanation | null
   verified: boolean | null
   message: string | null
+  citation: RagCitation | null
 }
 
 export async function explainPosition(request: ExplainRequest): Promise<ExplainResponse> {

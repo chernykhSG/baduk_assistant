@@ -49,7 +49,8 @@ describe('LlmExplanationPanel', () => {
       finding: null,
       explanation: { summary: 'Тестовое объяснение', claims: [] },
       verified: true,
-      message: null
+      message: null,
+      citation: null
     })
 
     const { getByText } = render(<LlmExplanationPanel />)
@@ -67,7 +68,8 @@ describe('LlmExplanationPanel', () => {
       finding: null,
       explanation: { summary: 'Резервное объяснение', claims: [] },
       verified: false,
-      message: null
+      message: null,
+      citation: null
     })
 
     const { getByText } = render(<LlmExplanationPanel />)
@@ -85,7 +87,8 @@ describe('LlmExplanationPanel', () => {
       finding: null,
       explanation: null,
       verified: null,
-      message: 'Ничего заметного не найдено в этой позиции'
+      message: 'Ничего заметного не найдено в этой позиции',
+      citation: null
     })
 
     const { getByText } = render(<LlmExplanationPanel />)
@@ -137,7 +140,8 @@ describe('LlmExplanationPanel', () => {
       finding: null,
       explanation: { summary: 'Объяснение для позиции A', claims: [] },
       verified: true,
-      message: null
+      message: null,
+      citation: null
     })
 
     const { getByText, queryByText } = render(<LlmExplanationPanel />)
@@ -214,7 +218,8 @@ describe('LlmExplanationPanel', () => {
       finding: null,
       explanation: { summary: 'Объяснение для позиции A (устарело)', claims: [] },
       verified: true,
-      message: null
+      message: null,
+      citation: null
     })
 
     // Force every pending microtask (the `await explainPosition(...)`
@@ -254,7 +259,8 @@ describe('LlmExplanationPanel', () => {
       finding: null,
       explanation: { summary: 'ok', claims: [] },
       verified: true,
-      message: null
+      message: null,
+      citation: null
     })
 
     const { getByText } = render(<LlmExplanationPanel />)
@@ -276,7 +282,8 @@ describe('LlmExplanationPanel', () => {
       finding: null,
       explanation: { summary: 'ok', claims: [] },
       verified: true,
-      message: null
+      message: null,
+      citation: null
     })
 
     const { getByText } = render(<LlmExplanationPanel />)
@@ -290,5 +297,57 @@ describe('LlmExplanationPanel', () => {
         })
       )
     })
+  })
+
+  it('shows a collapsible citation section, closed by default, that opens when clicked', async () => {
+    loadPosition()
+    mockExplainPosition.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Объяснение с цитатой', claims: [] },
+      verified: true,
+      message: null,
+      citation: {
+        doc_id: 'two-eyes-necessary',
+        title: 'Два глаза',
+        source: 'principles/two-eyes.md',
+        text_snippet: 'Группа с двумя глазами не может быть захвачена.'
+      }
+    })
+
+    const { getByText, container } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Объяснить эту позицию'))
+
+    await waitFor(() => {
+      expect(getByText('Два глаза', { exact: false })).toBeTruthy()
+    })
+
+    const details = container.querySelector(
+      'details.llm-explanation-panel__citation'
+    ) as HTMLDetailsElement
+    expect(details).toBeTruthy()
+    expect(details.open).toBe(false)
+
+    const summary = details.querySelector('summary') as HTMLElement
+    fireEvent.click(summary)
+    expect(details.open).toBe(true)
+  })
+
+  it('omits the citation section entirely when the response has no citation', async () => {
+    loadPosition()
+    mockExplainPosition.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Объяснение без цитаты', claims: [] },
+      verified: true,
+      message: null,
+      citation: null
+    })
+
+    const { getByText, container } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Объяснить эту позицию'))
+
+    await waitFor(() => {
+      expect(getByText('Объяснение без цитаты')).toBeTruthy()
+    })
+    expect(container.querySelector('.llm-explanation-panel__citation')).toBeNull()
   })
 })

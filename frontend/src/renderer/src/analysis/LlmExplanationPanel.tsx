@@ -92,6 +92,15 @@ export function LlmExplanationPanel(): JSX.Element {
             {result.verified ? 'Проверено' : 'Не удалось проверить численно'}
           </div>
           <div class="llm-explanation-panel__summary">{result.explanation.summary}</div>
+          {result.citation && (
+            <details class="llm-explanation-panel__citation">
+              <summary>
+                {result.citation.title}{' '}
+                <span class="llm-explanation-panel__citation-source">({result.citation.source})</span>
+              </summary>
+              <div class="llm-explanation-panel__citation-text">{result.citation.text_snippet}</div>
+            </details>
+          )}
         </>
       )}
     </div>

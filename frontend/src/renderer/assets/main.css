@@ -405,6 +405,20 @@ code {
   margin-top: 8px;
   white-space: pre-wrap;
 }
+.llm-explanation-panel__citation {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.llm-explanation-panel__citation summary {
+  cursor: pointer;
+}
+.llm-explanation-panel__citation-source {
+  opacity: 0.7;
+}
+.llm-explanation-panel__citation-text {
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
 .annotation-panel {
   padding: 8px;
 }
