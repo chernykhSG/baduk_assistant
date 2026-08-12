@@ -50,6 +50,46 @@ EXPLANATION_TOOL_PARAMETERS = {
     "required": ["summary", "claims"],
 }
 
+RAG_SEARCH_INSTRUCTIONS = """\
+У тебя есть доступ к базе знаний Го через retrieve_knowledge. Если находка \
+напоминает известный принцип или распространённую ошибку, поиск поможет дать \
+более обоснованное объяснение. Если сомневаешься - лучше поискать. Если явной \
+связи с базой знаний нет - отвечай record_explanation сразу, без поиска.
+"""
+
+EXPLANATION_WITH_RAG_TOOL_PARAMETERS = {
+    "type": "object",
+    "properties": {
+        **EXPLANATION_TOOL_PARAMETERS["properties"],  # summary, claims
+        "rag_doc_id": {"type": ["string", "null"]},
+    },
+    "required": ["summary", "claims"],
+}
+
+RAG_DECISION_TOOL_PARAMETERS = {
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {"tool": {"const": "retrieve_knowledge"}},
+            "required": ["tool"],
+        },
+        {
+            "type": "object",
+            "properties": {
+                "tool": {"const": "record_explanation"},
+                **EXPLANATION_WITH_RAG_TOOL_PARAMETERS["properties"],
+            },
+            "required": ["tool", "summary", "claims"],
+        },
+    ]
+}
+
+
+def build_rag_query(finding: Finding) -> str:
+    if finding.type == "weak_group":
+        return "слабая группа камней с недостатком глаз и территории"
+    return f"ошибка хода, потеря очков на стадии {finding.stage}"
+
 
 def build_user_prompt(finding: Finding, analysis: AnalyzeResponse, board_size: int) -> str:
     root = (

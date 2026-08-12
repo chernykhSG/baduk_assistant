@@ -24,3 +24,4 @@ class Claim(BaseModel):
 class Explanation(BaseModel):
     summary: str
     claims: list[Claim]
+    rag_doc_id: str | None = None
