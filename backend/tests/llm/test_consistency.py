@@ -250,3 +250,122 @@ def test_verify_and_retry_does_not_crash_on_cross_type_field_mistake_finding():
     assert provider.calls[1] is not None
     assert "weak_score" in provider.calls[1][0]
     assert "не относится" in provider.calls[1][0]
+
+
+def test_verify_and_retry_accepts_valid_rag_doc_id(monkeypatch):
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="...",
+                source="...",
+                text_snippet="...",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    explanation = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+        rag_doc_id="two-eyes-necessary",
+    )
+    provider = _RecordingFakeProvider([explanation])
+
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result.rag_doc_id == "two-eyes-necessary"
+    assert provider.calls == [None]
+
+
+def test_verify_and_retry_rejects_hallucinated_rag_doc_id_then_retries(monkeypatch):
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="real-doc", title="...", source="...", text_snippet="...", relevance_score=0.9
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    bad = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+        rag_doc_id="made-up-doc",
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+        rag_doc_id="real-doc",
+    )
+    provider = _RecordingFakeProvider([bad, good])
+
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result.rag_doc_id == "real-doc"
+    assert provider.calls[0] is None
+    assert provider.calls[1] is not None
+    assert "made-up-doc" in provider.calls[1][0]
+
+
+def test_verify_and_retry_treats_rag_store_unavailable_as_invalid_citation(monkeypatch):
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        raise RuntimeError("RAG store not found")
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    bad = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+        rag_doc_id="anything",
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+        rag_doc_id=None,
+    )
+    provider = _RecordingFakeProvider([bad, good])
+
+    result, verified = verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result.rag_doc_id is None
+
+
+def test_verify_and_retry_correction_does_not_mention_empty_claims_when_only_rag_doc_id_is_wrong(monkeypatch):
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="real-doc", title="...", source="...", text_snippet="...", relevance_score=0.9
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    bad = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+        rag_doc_id="made-up-doc",
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+        rag_doc_id="real-doc",
+    )
+    provider = _RecordingFakeProvider([bad, good])
+
+    verify_and_retry(provider, _finding(), _analysis(), 9)
+
+    # the numeric claim was already correct - the only real problem is the
+    # citation, so the correction message must not claim the claims list is
+    # empty (it isn't).
+    assert "ни одного утверждения" not in provider.calls[1][0]
