@@ -56,7 +56,10 @@ async def explain(
     if explanation.rag_doc_id is not None:
         from baduk_backend.rag.retrieval import get_snippet_by_id
 
-        snippet = await asyncio.to_thread(get_snippet_by_id, explanation.rag_doc_id)
+        try:
+            snippet = await asyncio.to_thread(get_snippet_by_id, explanation.rag_doc_id)
+        except Exception:
+            snippet = None
         if snippet is not None:
             citation = RagCitation(
                 doc_id=snippet.doc_id,

@@ -418,6 +418,8 @@ code {
 .llm-explanation-panel__citation-text {
   margin-top: 4px;
   white-space: pre-wrap;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 .annotation-panel {
   padding: 8px;

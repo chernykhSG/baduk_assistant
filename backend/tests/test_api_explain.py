@@ -260,6 +260,59 @@ def test_explain_omits_citation_when_rag_doc_id_is_none(explain_client):
     assert response.json()["citation"] is None
 
 
+def test_explain_omits_citation_when_snippet_lookup_raises_unexpectedly(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from baduk_backend.llm.schemas import Claim, Explanation
+    from baduk_backend.main import app
+
+    class _CitingProvider:
+        def complete(self, finding, analysis, board_size, corrections=None):
+            return Explanation(
+                summary="...",
+                claims=[
+                    Claim(
+                        text="...",
+                        finding_id=finding.finding_id,
+                        cited_field="weak_score",
+                        cited_number=finding.weak_score,
+                    )
+                ],
+                rag_doc_id="two-eyes-necessary",
+            )
+
+    def fake_get_snippet_by_id(doc_id, **kwargs):
+        raise RuntimeError("unexpected chroma failure")
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.get_snippet_by_id", fake_get_snippet_by_id)
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        from baduk_backend.rag.schemas import RagSnippet
+
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="...",
+                source="...",
+                text_snippet="...",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    app.state.llm_provider = _CitingProvider()
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/explain", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload()
+        )
+        assert response.status_code == 200
+        assert response.json()["citation"] is None
+    finally:
+        del app.state.llm_provider
+
+
 def test_explain_omits_citation_when_snippet_lookup_returns_none(monkeypatch):
     from fastapi.testclient import TestClient
 

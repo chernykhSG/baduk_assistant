@@ -77,8 +77,8 @@ def get_snippet_by_id(doc_id: str, store_path: Path = DEFAULT_STORE_PATH) -> Rag
     document = result["documents"][0]
     return RagSnippet(
         doc_id=ids[0],
-        title=metadata["title"],
-        source=metadata["source"],
+        title=metadata.get("title", ""),
+        source=metadata.get("source", ""),
         text_snippet=document,
         # This is a direct id lookup, not a ranked semantic query - there is
         # no distance/similarity to report. 1.0 documents "this is exactly
