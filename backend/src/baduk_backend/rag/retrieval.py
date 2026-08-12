@@ -54,3 +54,34 @@ def retrieve_knowledge(
             )
         )
     return snippets
+
+
+def get_snippet_by_id(doc_id: str, store_path: Path = DEFAULT_STORE_PATH) -> RagSnippet | None:
+    if not store_path.exists():
+        return None
+
+    client = get_chroma_client(store_path)
+    from chromadb.errors import NotFoundError
+
+    try:
+        collection = client.get_collection(name=COLLECTION_NAME)
+    except NotFoundError:
+        return None
+
+    result = collection.get(ids=[doc_id])
+    ids = result["ids"]
+    if not ids:
+        return None
+
+    metadata = result["metadatas"][0]
+    document = result["documents"][0]
+    return RagSnippet(
+        doc_id=ids[0],
+        title=metadata["title"],
+        source=metadata["source"],
+        text_snippet=document,
+        # This is a direct id lookup, not a ranked semantic query - there is
+        # no distance/similarity to report. 1.0 documents "this is exactly
+        # the requested card", not a computed relevance.
+        relevance_score=1.0,
+    )

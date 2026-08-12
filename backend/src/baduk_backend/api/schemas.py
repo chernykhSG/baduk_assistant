@@ -88,8 +88,16 @@ class ExplainRequest(BaseModel):
         return self
 
 
+class RagCitation(BaseModel):
+    doc_id: str
+    title: str
+    source: str
+    text_snippet: str
+
+
 class ExplainResponse(BaseModel):
     finding: Finding | None = None
     explanation: Explanation | None = None
     verified: bool | None = None
     message: str | None = None
+    citation: RagCitation | None = None

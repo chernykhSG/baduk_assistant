@@ -176,3 +176,143 @@ def test_explain_returns_503_when_llm_provider_fails():
         assert response.status_code == 503
     finally:
         del app.state.llm_provider
+
+
+def test_explain_includes_citation_when_rag_doc_id_is_set(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from baduk_backend.llm.schemas import Claim, Explanation
+    from baduk_backend.main import app
+    from baduk_backend.rag.schemas import RagSnippet
+
+    class _CitingProvider:
+        def complete(self, finding, analysis, board_size, corrections=None):
+            return Explanation(
+                summary="...",
+                claims=[
+                    Claim(
+                        text="...",
+                        finding_id=finding.finding_id,
+                        cited_field="weak_score",
+                        cited_number=finding.weak_score,
+                    )
+                ],
+                rag_doc_id="two-eyes-necessary",
+            )
+
+    def fake_get_snippet_by_id(doc_id, **kwargs):
+        assert doc_id == "two-eyes-necessary"
+        return RagSnippet(
+            doc_id="two-eyes-necessary",
+            title="Два глаза",
+            source="principles/two-eyes.md",
+            text_snippet="Группа с двумя глазами не может быть захвачена.",
+            relevance_score=1.0,
+        )
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.get_snippet_by_id", fake_get_snippet_by_id)
+
+    # verify_and_retry()'s consistency check (baduk_backend.llm.consistency
+    # ._rag_doc_id_valid) independently confirms a cited rag_doc_id is real by
+    # running a semantic retrieve_knowledge() query against the actual RAG
+    # store on disk (see tests/llm/test_consistency.py::
+    # test_verify_and_retry_accepts_valid_rag_doc_id for the same idiom) - it
+    # is unrelated to get_snippet_by_id (a primary-key lookup) but sits
+    # upstream of it in /api/explain, so a fabricated doc_id must also be
+    # made to pass that check, or verify_and_retry() falls back to a
+    # templated Explanation with rag_doc_id=None before explain.py ever gets
+    # a chance to call get_snippet_by_id.
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="Два глаза",
+                source="principles/two-eyes.md",
+                text_snippet="Группа с двумя глазами не может быть захвачена.",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    app.state.llm_provider = _CitingProvider()
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/explain", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload()
+        )
+        assert response.status_code == 200
+        assert response.json()["citation"] == {
+            "doc_id": "two-eyes-necessary",
+            "title": "Два глаза",
+            "source": "principles/two-eyes.md",
+            "text_snippet": "Группа с двумя глазами не может быть захвачена.",
+        }
+    finally:
+        del app.state.llm_provider
+
+
+def test_explain_omits_citation_when_rag_doc_id_is_none(explain_client):
+    response = explain_client.post(
+        "/api/explain", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload()
+    )
+    assert response.status_code == 200
+    assert response.json()["citation"] is None
+
+
+def test_explain_omits_citation_when_snippet_lookup_returns_none(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from baduk_backend.llm.schemas import Claim, Explanation
+    from baduk_backend.main import app
+    from baduk_backend.rag.schemas import RagSnippet
+
+    class _CitingProvider:
+        def complete(self, finding, analysis, board_size, corrections=None):
+            return Explanation(
+                summary="...",
+                claims=[
+                    Claim(
+                        text="...",
+                        finding_id=finding.finding_id,
+                        cited_field="weak_score",
+                        cited_number=finding.weak_score,
+                    )
+                ],
+                rag_doc_id="vanished-doc",
+            )
+
+    def fake_get_snippet_by_id(doc_id, **kwargs):
+        return None
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.get_snippet_by_id", fake_get_snippet_by_id)
+
+    # See the comment in test_explain_includes_citation_when_rag_doc_id_is_set:
+    # verify_and_retry()'s consistency check must also accept "vanished-doc"
+    # as a real citation, otherwise it falls back before rag_doc_id ever
+    # reaches explain.py's get_snippet_by_id call, and this test would pass
+    # without ever exercising the "snippet lookup returns None" path it's
+    # named for.
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="vanished-doc",
+                title="...",
+                source="...",
+                text_snippet="...",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    app.state.llm_provider = _CitingProvider()
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/explain", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload()
+        )
+        assert response.status_code == 200
+        assert response.json()["citation"] is None
+    finally:
+        del app.state.llm_provider
