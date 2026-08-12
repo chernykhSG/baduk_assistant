@@ -77,12 +77,12 @@ def _fallback_explanation(finding: Finding) -> Explanation:
 def _rag_doc_id_valid(rag_doc_id: str | None, finding: Finding) -> bool:
     if rag_doc_id is None:
         return True
-    from baduk_backend.llm.prompts import build_rag_query
+    from baduk_backend.llm.prompts import RAG_TOP_K, build_rag_query
     from baduk_backend.rag.retrieval import retrieve_knowledge
 
     query = build_rag_query(finding)
     try:
-        snippets = retrieve_knowledge(query, top_k=3)
+        snippets = retrieve_knowledge(query, top_k=RAG_TOP_K)
     except (RuntimeError, ImportError):
         return False
     return rag_doc_id in {s.doc_id for s in snippets}
@@ -95,21 +95,21 @@ def _rag_doc_id_correction_message(rag_doc_id: str | None) -> str:
     )
 
 
-def _is_verified(explanation: Explanation, finding: Finding, analysis: AnalyzeResponse) -> bool:
+def _is_verified(
+    explanation: Explanation, finding: Finding, analysis: AnalyzeResponse, rag_doc_id_ok: bool
+) -> bool:
     # An explanation with zero claims makes no checkable assertions at all -
     # treat it the same as a numeric mismatch rather than trivially passing,
     # otherwise citation-based verification is defeated by simply omitting
     # claims. `_fallback_explanation` legitimately returns claims=[] too, but
     # that value is only ever constructed and returned directly as the final
     # result below - it never flows back through this check.
-    return (
-        bool(explanation.claims)
-        and not _mismatches(explanation, finding, analysis)
-        and _rag_doc_id_valid(explanation.rag_doc_id, finding)
-    )
+    return bool(explanation.claims) and not _mismatches(explanation, finding, analysis) and rag_doc_id_ok
 
 
-def _build_corrections(explanation: Explanation, finding: Finding, analysis: AnalyzeResponse) -> list[str]:
+def _build_corrections(
+    explanation: Explanation, finding: Finding, analysis: AnalyzeResponse, rag_doc_id_ok: bool
+) -> list[str]:
     if not explanation.claims:
         corrections = [_EMPTY_CLAIMS_CORRECTION]
     else:
@@ -117,7 +117,7 @@ def _build_corrections(explanation: Explanation, finding: Finding, analysis: Ana
             _correction_message(c, finding, analysis)
             for c in _mismatches(explanation, finding, analysis)
         ]
-    if not _rag_doc_id_valid(explanation.rag_doc_id, finding):
+    if not rag_doc_id_ok:
         corrections.append(_rag_doc_id_correction_message(explanation.rag_doc_id))
     return corrections
 
@@ -127,10 +127,12 @@ def verify_and_retry(
 ) -> tuple[Explanation, bool]:
     explanation = provider.complete(finding, analysis, board_size)
     for _ in range(MAX_CONSISTENCY_RETRIES):
-        if _is_verified(explanation, finding, analysis):
+        rag_doc_id_ok = _rag_doc_id_valid(explanation.rag_doc_id, finding)
+        if _is_verified(explanation, finding, analysis, rag_doc_id_ok):
             return explanation, True
-        corrections = _build_corrections(explanation, finding, analysis)
+        corrections = _build_corrections(explanation, finding, analysis, rag_doc_id_ok)
         explanation = provider.complete(finding, analysis, board_size, corrections=corrections)
-    if _is_verified(explanation, finding, analysis):
+    rag_doc_id_ok = _rag_doc_id_valid(explanation.rag_doc_id, finding)
+    if _is_verified(explanation, finding, analysis, rag_doc_id_ok):
         return explanation, True
     return _fallback_explanation(finding), False

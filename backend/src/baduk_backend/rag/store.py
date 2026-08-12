@@ -1,3 +1,4 @@
+import functools
 from pathlib import Path
 
 DEFAULT_STORE_PATH = Path(__file__).resolve().parents[3] / "rag_store"
@@ -11,6 +12,7 @@ def get_chroma_client(store_path: Path = DEFAULT_STORE_PATH):
     return chromadb.PersistentClient(path=str(store_path))
 
 
+@functools.lru_cache(maxsize=1)
 def get_embedding_model():
     from sentence_transformers import SentenceTransformer
 

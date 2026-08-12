@@ -14,6 +14,7 @@ from baduk_backend.llm.prompts import (
     EXPLANATION_WITH_RAG_TOOL_PARAMETERS,
     RAG_DECISION_TOOL_PARAMETERS,
     RAG_SEARCH_INSTRUCTIONS,
+    RAG_TOP_K,
     SYSTEM_PROMPT,
     build_rag_query,
     build_user_prompt,
@@ -24,7 +25,6 @@ from baduk_backend.rag.schemas import RagSnippet
 DEFAULT_N_GPU_LAYERS = -1
 DEFAULT_N_CTX = 8192
 DEFAULT_MAX_TOKENS = 2048
-RAG_TOP_K = 3
 
 
 def _rag_available() -> bool:
@@ -45,6 +45,10 @@ def _format_snippets(snippets: list[RagSnippet]) -> str:
         parts.append(
             f'doc_id="{snippet.doc_id}", "{snippet.title}" ({snippet.source}):\n{snippet.text_snippet}'
         )
+    parts.append(
+        "Если один из этих материалов действительно объясняет находку - укажи его doc_id "
+        "в поле rag_doc_id. Если ни один не подходит - оставь rag_doc_id пустым (null)."
+    )
     return "\n\n".join(parts)
 
 
@@ -115,7 +119,6 @@ class LlamaProvider:
         decision = _extract_json(decision_choice)
 
         if decision.get("tool") != "retrieve_knowledge":
-            decision.pop("tool", None)
             return _validate_explanation(decision, decision_choice.get("finish_reason"))
 
         from baduk_backend.rag.retrieval import retrieve_knowledge

@@ -85,6 +85,9 @@ RAG_DECISION_TOOL_PARAMETERS = {
 }
 
 
+RAG_TOP_K = 3
+
+
 def build_rag_query(finding: Finding) -> str:
     if finding.type == "weak_group":
         return "слабая группа камней с недостатком глаз и территории"
