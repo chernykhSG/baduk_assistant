@@ -10,13 +10,33 @@ from baduk_backend.feature_extraction.schemas import WeakGroupFinding
 from baduk_backend.llm.providers.llama import LlamaProvider
 
 
+@pytest.fixture(autouse=True)
+def _no_rag_by_default(monkeypatch):
+    # Without this, `_rag_available()` would do a REAL check against this
+    # dev machine's actual chromadb/sentence_transformers install and
+    # backend/rag_store/ directory - both of which may genuinely exist here
+    # (installed/ingested for the RAG ingestion slice's own tests), making
+    # every pre-existing test in this file non-deterministic depending on
+    # local machine state. Force the RAG-unavailable path by default; the
+    # new RAG-specific tests below override this within their own body.
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: False)
+
+
 class _FakeLlama:
     def __init__(self, response):
-        self._response = response
+        # `response` may be a single response dict (returned for every call -
+        # the shape every pre-existing single-call test in this file uses)
+        # or a list of response dicts, returned one per call in order - the
+        # two-call agentic RAG flow needs a different response for its
+        # decision call vs. its finalize call.
+        self._sequence = response if isinstance(response, list) else None
+        self._response = None if isinstance(response, list) else response
         self.calls: list[dict] = []
 
     def create_chat_completion(self, **kwargs):
         self.calls.append(kwargs)
+        if self._sequence is not None:
+            return self._sequence[len(self.calls) - 1]
         return self._response
 
 
@@ -182,3 +202,156 @@ def test_llama_provider_has_a_lock_guarding_the_shared_llama_instance():
     provider = LlamaProvider(llm=llm)
 
     assert isinstance(provider._lock, type(threading.Lock()))
+
+
+def test_llama_provider_without_rag_available_uses_original_single_call_schema():
+    from baduk_backend.llm.prompts import EXPLANATION_TOOL_PARAMETERS
+
+    response = _json_response("ok", [])
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    explanation = provider.complete(_finding(), _analysis(), board_size=9)
+
+    assert len(llm.calls) == 1
+    assert llm.calls[0]["response_format"] == {"type": "json_object", "schema": EXPLANATION_TOOL_PARAMETERS}
+    assert explanation.rag_doc_id is None
+
+
+def test_llama_provider_with_rag_available_can_decide_not_to_search(monkeypatch):
+    from baduk_backend.llm.prompts import RAG_DECISION_TOOL_PARAMETERS
+
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+    response = _chat_completion_response(
+        json.dumps({"tool": "record_explanation", "summary": "ok", "claims": []})
+    )
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    explanation = provider.complete(_finding(), _analysis(), board_size=9)
+
+    assert len(llm.calls) == 1
+    assert llm.calls[0]["response_format"] == {"type": "json_object", "schema": RAG_DECISION_TOOL_PARAMETERS}
+    assert explanation.summary == "ok"
+    assert explanation.rag_doc_id is None
+
+
+def test_llama_provider_with_rag_available_searches_then_finalizes(monkeypatch):
+    from baduk_backend.llm.prompts import EXPLANATION_WITH_RAG_TOOL_PARAMETERS, RAG_DECISION_TOOL_PARAMETERS
+    from baduk_backend.rag.schemas import RagSnippet
+
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        assert top_k == 3
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="Два глаза",
+                source="principles/two-eyes.md",
+                text_snippet="Группа с двумя глазами не может быть захвачена.",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    decision_response = _chat_completion_response(json.dumps({"tool": "retrieve_knowledge"}))
+    final_response = _chat_completion_response(
+        json.dumps(
+            {"summary": "Найдена слабая группа.", "claims": [], "rag_doc_id": "two-eyes-necessary"}
+        )
+    )
+    llm = _FakeLlama([decision_response, final_response])
+    provider = LlamaProvider(llm=llm)
+
+    explanation = provider.complete(_finding(), _analysis(), board_size=9)
+
+    assert len(llm.calls) == 2
+    assert llm.calls[0]["response_format"] == {"type": "json_object", "schema": RAG_DECISION_TOOL_PARAMETERS}
+    assert llm.calls[1]["response_format"] == {
+        "type": "json_object",
+        "schema": EXPLANATION_WITH_RAG_TOOL_PARAMETERS,
+    }
+    final_user_content = next(m["content"] for m in llm.calls[1]["messages"] if m["role"] == "user")
+    assert "two-eyes-necessary" in final_user_content
+    assert "Группа с двумя глазами" in final_user_content
+    assert explanation.rag_doc_id == "two-eyes-necessary"
+    assert explanation.summary == "Найдена слабая группа."
+
+
+def test_llama_provider_degrades_gracefully_when_search_fails_mid_flow(monkeypatch):
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        raise RuntimeError("RAG store not found")
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    decision_response = _chat_completion_response(json.dumps({"tool": "retrieve_knowledge"}))
+    final_response = _chat_completion_response(json.dumps({"summary": "ok", "claims": [], "rag_doc_id": None}))
+    llm = _FakeLlama([decision_response, final_response])
+    provider = LlamaProvider(llm=llm)
+
+    explanation = provider.complete(_finding(), _analysis(), board_size=9)
+
+    assert len(llm.calls) == 2
+    final_user_content = next(m["content"] for m in llm.calls[1]["messages"] if m["role"] == "user")
+    assert "не дал результатов" in final_user_content
+    assert explanation.rag_doc_id is None
+
+
+def test_format_snippets_lists_doc_id_title_and_text():
+    from baduk_backend.llm.providers.llama import _format_snippets
+    from baduk_backend.rag.schemas import RagSnippet
+
+    snippets = [
+        RagSnippet(
+            doc_id="d1",
+            title="Заголовок",
+            source="principles/d1.md",
+            text_snippet="Текст карточки.",
+            relevance_score=0.8,
+        )
+    ]
+    formatted = _format_snippets(snippets)
+    assert "d1" in formatted
+    assert "Заголовок" in formatted
+    assert "Текст карточки." in formatted
+
+
+def test_format_snippets_handles_empty_list():
+    from baduk_backend.llm.providers.llama import _format_snippets
+
+    assert "не дал результатов" in _format_snippets([])
+
+
+def test_rag_available_returns_false_when_store_missing(tmp_path, monkeypatch):
+    pytest.importorskip("chromadb")
+    pytest.importorskip("sentence_transformers")
+    # Restore the real `_rag_available` that the autouse `_no_rag_by_default`
+    # fixture patched away before this test body runs - otherwise the
+    # `from ... import _rag_available` below would capture that fixture's
+    # fake `lambda: False` instead of the real implementation this test
+    # means to exercise.
+    monkeypatch.undo()
+    from baduk_backend.llm.providers.llama import _rag_available
+
+    monkeypatch.setattr("baduk_backend.rag.store.DEFAULT_STORE_PATH", tmp_path / "does_not_exist")
+
+    assert _rag_available() is False
+
+
+def test_rag_available_returns_true_when_installed_and_store_exists(tmp_path, monkeypatch):
+    pytest.importorskip("chromadb")
+    pytest.importorskip("sentence_transformers")
+    # See test_rag_available_returns_false_when_store_missing above: undo the
+    # autouse fixture's patch first so this imports the real `_rag_available`.
+    monkeypatch.undo()
+    from baduk_backend.llm.providers.llama import _rag_available
+
+    store_path = tmp_path / "rag_store"
+    store_path.mkdir()
+    monkeypatch.setattr("baduk_backend.rag.store.DEFAULT_STORE_PATH", store_path)
+
+    assert _rag_available() is True
