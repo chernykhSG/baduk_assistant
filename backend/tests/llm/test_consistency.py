@@ -369,3 +369,67 @@ def test_verify_and_retry_correction_does_not_mention_empty_claims_when_only_rag
     # citation, so the correction message must not claim the claims list is
     # empty (it isn't).
     assert "ни одного утверждения" not in provider.calls[1][0]
+
+
+from baduk_backend.feature_extraction.schemas import OpeningLossFinding
+
+
+def _opening_loss_finding() -> OpeningLossFinding:
+    return OpeningLossFinding(
+        finding_id="f_test",
+        type="opening_loss",
+        color="B",
+        move_range=(1, 9),
+        delta_score=7.0,
+        severity="medium",
+        confidence=0.8,
+    )
+
+
+def test_verify_and_retry_accepts_correct_opening_loss_claims():
+    explanation = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=7.0)],
+    )
+    provider = _RecordingFakeProvider([explanation])
+
+    result, verified = verify_and_retry(provider, _opening_loss_finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == explanation
+
+
+def test_verify_and_retry_falls_back_with_opening_loss_specific_summary():
+    bad = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=0.1)],
+    )
+    provider = _RecordingFakeProvider([bad, bad, bad])
+
+    result, verified = verify_and_retry(provider, _opening_loss_finding(), _analysis(), 9)
+
+    assert verified is False
+    assert result.claims == []
+    assert "7.00" in result.summary
+    assert "1-9" in result.summary
+
+
+def test_verify_and_retry_does_not_crash_on_cross_type_field_opening_loss_finding():
+    # weak_score belongs to WeakGroupFinding, not OpeningLossFinding, and is
+    # not a rootInfo attribute either - citing it against an opening_loss
+    # finding must be treated as a mismatch (retry), never raise AttributeError.
+    cross_type = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="weak_score", cited_number=0.85)],
+    )
+    good = Explanation(
+        summary="...",
+        claims=[Claim(text="...", finding_id="f_test", cited_field="delta_score", cited_number=7.0)],
+    )
+    provider = _RecordingFakeProvider([cross_type, good])
+
+    result, verified = verify_and_retry(provider, _opening_loss_finding(), _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert "не относится" in provider.calls[1][0]

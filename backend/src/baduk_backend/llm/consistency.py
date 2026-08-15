@@ -9,6 +9,7 @@ FLOAT_TOLERANCE = 0.01
 _FINDING_FIELDS: dict[str, set[str]] = {
     "weak_group": {"weak_score", "own_certainty", "boundary_certainty", "liberties"},
     "mistake": {"delta_score"},
+    "opening_loss": {"delta_score"},
 }
 
 _EMPTY_CLAIMS_CORRECTION = (
@@ -57,20 +58,31 @@ def _correction_message(claim: Claim, finding: Finding, analysis: AnalyzeRespons
 
 
 def _fallback_explanation(finding: Finding) -> Explanation:
-    if finding.type == "weak_group":
-        summary = (
-            f"Обнаружена слабая группа (ход {finding.turn_number}): "
-            f"показатель уязвимости {finding.weak_score:.2f}, уверенность {finding.confidence:.2f}. "
-            "Не удалось получить проверенное текстовое объяснение - "
-            "эти числа стоит свериться с ходами-кандидатами вручную."
-        )
-    else:
-        summary = (
-            f"Обнаружена потеря очков на ходе {finding.turn_number}: "
-            f"Δ={finding.delta_score:.2f}, уверенность {finding.confidence:.2f}. "
-            "Не удалось получить проверенное текстовое объяснение - "
-            "эти числа стоит свериться с ходами-кандидатами вручную."
-        )
+    match finding.type:
+        case "weak_group":
+            summary = (
+                f"Обнаружена слабая группа (ход {finding.turn_number}): "
+                f"показатель уязвимости {finding.weak_score:.2f}, уверенность {finding.confidence:.2f}. "
+                "Не удалось получить проверенное текстовое объяснение - "
+                "эти числа стоит свериться с ходами-кандидатами вручную."
+            )
+        case "mistake":
+            summary = (
+                f"Обнаружена потеря очков на ходе {finding.turn_number}: "
+                f"Δ={finding.delta_score:.2f}, уверенность {finding.confidence:.2f}. "
+                "Не удалось получить проверенное текстовое объяснение - "
+                "эти числа стоит свериться с ходами-кандидатами вручную."
+            )
+        case "opening_loss":
+            summary = (
+                f"Накопленная потеря очков в дебюте (ходы {finding.move_range[0]}-"
+                f"{finding.move_range[1]}): Δ={finding.delta_score:.2f}, "
+                f"уверенность {finding.confidence:.2f}. "
+                "Не удалось получить проверенное текстовое объяснение - "
+                "эти числа стоит свериться с ходами-кандидатами вручную."
+            )
+        case _:
+            raise AssertionError(f"unhandled finding type: {finding.type}")
     return Explanation(summary=summary, claims=[])
 
 
