@@ -425,11 +425,13 @@ describe('LlmExplanationPanel', () => {
     expect(getByText('Разбор дебюта')).toBeTruthy()
   })
 
-  it('disables the opening button when the current node itself lacks analysis, even though the opening window is fully covered', () => {
+  it('calls explainOpening with the opening-window-boundary analysis, not the current node\'s analysis', async () => {
     // 11 moves on a 9x9 board: the opening window is floor(81*0.12)=9, so
-    // buildOpeningSequence only needs turns 0..9 (10 nodes) - it succeeds
-    // even though the current (leaf, turn-11) node lies past the window and
-    // has no analysis of its own.
+    // buildOpeningSequence covers turns 0..9 (10 nodes, indices 0..9) - the
+    // window's boundary node is nodeIds[9]. The current node (leaf, index
+    // 11) lies well past the window and has its own, deliberately
+    // different, analysis - explainOpening must be sent the boundary's
+    // rootInfo, not the current node's.
     const tree = parseSgf(
       '(;GM[1]FF[4]SZ[9];B[ee];W[gg];B[cc];W[dd];B[ff];W[hh];B[bb];W[ib];B[gc];W[fd];B[ea])'
     )
@@ -437,8 +439,20 @@ describe('LlmExplanationPanel', () => {
     const nodeIds = nodeIdsFromRootToNode(tree, leaf.id)
     currentTree.value = tree
     currentNodeId.value = leaf.id
-    analysisByTurn.value = new Map(
-      nodeIds.slice(0, 10).map((id, turn) => [
+    const boundaryAnalysis = {
+      id: 'boundary',
+      moveInfos: [],
+      rootInfo: { winrate: 0.5, scoreLead: 3, visits: 1000 },
+      ownership: undefined
+    }
+    const currentNodeAnalysis = {
+      id: 'current',
+      moveInfos: [],
+      rootInfo: { winrate: 0.1, scoreLead: -20, visits: 500 },
+      ownership: undefined
+    }
+    const entries = new Map(
+      nodeIds.slice(0, 9).map((id, turn) => [
         id,
         {
           id: String(turn),
@@ -448,9 +462,67 @@ describe('LlmExplanationPanel', () => {
         }
       ])
     )
+    entries.set(nodeIds[9], boundaryAnalysis)
+    entries.set(nodeIds[11], currentNodeAnalysis)
+    analysisByTurn.value = entries
+
+    mockExplainOpening.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Разбор дебюта', claims: [] },
+      verified: true,
+      message: null,
+      citation: null
+    })
 
     const { getByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Проанализировать дебют'))
 
-    expect((getByText('Проанализировать дебют') as HTMLButtonElement).disabled).toBe(true)
+    await waitFor(() => {
+      expect(mockExplainOpening).toHaveBeenCalledWith(
+        expect.objectContaining({ analysisAtEnd: boundaryAnalysis })
+      )
+    })
+  })
+
+  it('shows a hint when the opening window is not fully analyzed, and hides it once it is', async () => {
+    const { getByText, queryByText } = render(<LlmExplanationPanel />)
+
+    expect(getByText('Дебют ещё не полностью проанализирован')).toBeTruthy()
+
+    loadOpeningReadyPosition()
+
+    await waitFor(() => {
+      expect(queryByText('Дебют ещё не полностью проанализирован')).toBeNull()
+    })
+  })
+
+  it('resets the opening result when a different game is loaded', async () => {
+    loadOpeningReadyPosition()
+    mockExplainOpening.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Разбор дебюта', claims: [] },
+      verified: true,
+      message: null,
+      citation: null
+    })
+
+    const { getByText, queryByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Проанализировать дебют'))
+    await waitFor(() => {
+      expect(getByText('Разбор дебюта')).toBeTruthy()
+    })
+
+    // Simulate loading an entirely different SGF file, as App.tsx does on
+    // file load: a fresh GameTree object (not just a different node within
+    // the same tree), a new current node, and fresh per-turn analysis.
+    const otherTree = parseSgf('(;GM[1]FF[4]SZ[9];B[cc])')
+    const otherLeaf = findMainLineLeaf(otherTree)
+    currentTree.value = otherTree
+    currentNodeId.value = otherLeaf.id
+    analysisByTurn.value = new Map()
+
+    await waitFor(() => {
+      expect(queryByText('Разбор дебюта')).toBeNull()
+    })
   })
 })

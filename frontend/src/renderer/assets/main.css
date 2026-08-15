@@ -435,6 +435,11 @@ code {
   margin-right: 12px;
   cursor: pointer;
 }
+.llm-explanation-panel__opening-hint {
+  margin-top: 4px;
+  opacity: 0.7;
+  font-size: 12px;
+}
 .annotation-panel {
   padding: 8px;
 }

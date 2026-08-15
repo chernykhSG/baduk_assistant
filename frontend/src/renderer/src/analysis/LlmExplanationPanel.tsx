@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import type { JSX } from 'preact'
 import { currentTree, currentNodeId, currentMoveAnalysis, analysisByTurn } from '../state/appState'
-import { getBoardSize } from '../board/sgfLoader'
+import { getBoardSize, nodeIdsFromRootToNode } from '../board/sgfLoader'
 import type { NodeObject } from '../board/sgfLoader'
 import { gtpMoves, sgfCoordToGtp, buildOpeningSequence } from '../board/gameRequestBuilder'
 import { explainPosition, explainOpening } from '../ipc/client'
@@ -76,12 +76,40 @@ export function LlmExplanationPanel(): JSX.Element {
   const [openingResult, setOpeningResult] = useState<ExplainResponse | null>(null)
   const [openingErrorMessage, setOpeningErrorMessage] = useState<string | null>(null)
 
+  // Any previously fetched opening explanation is tied to whatever game was
+  // loaded when the request was made, not to a specific board position
+  // within it (deliberately - it must survive ordinary move navigation, see
+  // below). But loading a genuinely different SGF file makes it stale, so
+  // reset whenever `tree` itself changes to a new object (App.tsx assigns a
+  // fresh GameTree on every file load; ordinary navigation only changes
+  // `currentNodeId` and leaves the same `tree` reference in place).
+  useEffect(() => {
+    setOpeningStatus('idle')
+    setOpeningResult(null)
+    setOpeningErrorMessage(null)
+  }, [tree])
+
+  const windowNodeIds = tree && nodeId !== null ? nodeIdsFromRootToNode(tree, nodeId) : null
   const openingSequence = tree && nodeId !== null ? buildOpeningSequence(tree, nodeId, getBoardSize(tree)) : null
-  const analysisAtEnd = nodeId !== null ? analysisByTurn.value.get(nodeId) : undefined
+  // The analysis at the boundary of the opening window (the last turn
+  // covered by openingSequence) - NOT the analysis at wherever the user's
+  // cursor currently is, which may lie well past the window on a longer
+  // game. This is what the LLM prompt and the anti-hallucination checker
+  // use as "the" rootInfo for the opening-loss explanation, so it must
+  // match the window, not the current position.
+  const analysisAtEnd =
+    windowNodeIds && openingSequence
+      ? analysisByTurn.value.get(windowNodeIds[openingSequence.length - 1])
+      : undefined
 
   async function handleExplainOpening(): Promise<void> {
-    if (!tree || nodeId === null || !openingSequence) return
-    if (!analysisAtEnd) return
+    if (!tree || nodeId === null || !openingSequence || !analysisAtEnd) return
+    // Capture the game this specific request was made for, so that if the
+    // user loads a different SGF file before the response arrives, the
+    // stale response below can be detected and dropped instead of
+    // repopulating the panel with an explanation attributed to a game
+    // that's no longer open.
+    const requestedTree = tree
     const boardSize = getBoardSize(tree)
     setOpeningStatus('loading')
     setOpeningErrorMessage(null)
@@ -94,9 +122,11 @@ export function LlmExplanationPanel(): JSX.Element {
         openingSequence,
         analysisAtEnd
       })
+      if (currentTree.value !== requestedTree) return
       setOpeningResult(response)
       setOpeningStatus('done')
     } catch (err) {
+      if (currentTree.value !== requestedTree) return
       setOpeningErrorMessage(err instanceof Error ? err.message : 'Не удалось получить объяснение')
       setOpeningStatus('error')
     }
@@ -156,11 +186,16 @@ export function LlmExplanationPanel(): JSX.Element {
         </label>
         <button
           type="button"
-          disabled={!openingSequence || !analysisAtEnd || openingStatus === 'loading'}
+          disabled={!openingSequence || openingStatus === 'loading'}
           onClick={handleExplainOpening}
         >
           {openingStatus === 'loading' ? 'Анализирую...' : 'Проанализировать дебют'}
         </button>
+        {!openingSequence && (
+          <div class="llm-explanation-panel__opening-hint">
+            Дебют ещё не полностью проанализирован
+          </div>
+        )}
         {openingStatus === 'error' && (
           <div class="llm-explanation-panel__error">{openingErrorMessage}</div>
         )}
