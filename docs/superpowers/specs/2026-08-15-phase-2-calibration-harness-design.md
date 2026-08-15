@@ -48,15 +48,18 @@
     "pv_focus_top_k": 5, "pv_focus_distance_d": 2
   },
   "mistake": {
-    "threshold_mistake": 0.5, "severity_high": 6.0, "severity_medium": 1.5,
-    "k_open": 0.12, "k_end": 0.15
+    "threshold_mistake": 0.5, "severity_high": 6.0, "severity_medium": 1.5
   },
   "opening_loss": {
     "threshold_opening_loss": 3.0, "severity_medium": 5.0, "severity_high": 15.0
   },
+  "k_open": 0.12,
+  "k_end": 0.15,
   "min_reliable_visits": 500
 }
 ```
+
+**`k_open`/`k_end` live at the top level, not inside `mistake`.** Grounding against the actual merged code (not assumed from this spec's earlier draft) shows they're shared by three consumers, not `mistake`-specific: `mistake.py`'s `_stage()`, `opening_loss.py`'s `detect_opening_loss()` (window-boundary calculation), and `api/schemas.py`'s `ExplainOpeningRequest` validator (`_sequence_matches_opening_window`, currently `from baduk_backend.feature_extraction.config import K_OPEN`). Nesting them under `mistake` would either duplicate the values (drift risk — the exact class of bug already flagged as a deferred Minor finding on the `opening_loss` branch) or leave `opening_loss.py`/`api/schemas.py` with no config source at all. `api/schemas.py` therefore also needs its import changed (`from baduk_backend.feature_extraction.config_loader import DEFAULT_CONFIG`, reference `DEFAULT_CONFIG.k_open`), even though it isn't a detector module — this file is in scope for this task too.
 
 `feature_extraction/config_loader.py`:
 
@@ -75,8 +78,6 @@ class MistakeConfig(BaseModel):
     threshold_mistake: float
     severity_high: float
     severity_medium: float
-    k_open: float
-    k_end: float
 
 class OpeningLossConfig(BaseModel):
     threshold_opening_loss: float
@@ -88,6 +89,8 @@ class DetectorConfig(BaseModel):
     weak_group: WeakGroupConfig
     mistake: MistakeConfig
     opening_loss: OpeningLossConfig
+    k_open: float
+    k_end: float
     min_reliable_visits: int
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "detector_config.v1.json"
@@ -116,6 +119,8 @@ def detect_weak_group(
 def detect_mistake(
     board, analysis_before, analysis_after, next_move, board_x_size, board_y_size, turn_number,
     config: MistakeConfig = DEFAULT_CONFIG.mistake,
+    k_open: float = DEFAULT_CONFIG.k_open,
+    k_end: float = DEFAULT_CONFIG.k_end,
     min_reliable_visits: int = DEFAULT_CONFIG.min_reliable_visits,
 ) -> MistakeFinding | None: ...
 
@@ -123,9 +128,12 @@ def detect_mistake(
 def detect_opening_loss(
     moves, sequence, color, board_x_size, board_y_size,
     config: OpeningLossConfig = DEFAULT_CONFIG.opening_loss,
+    k_open: float = DEFAULT_CONFIG.k_open,
     min_reliable_visits: int = DEFAULT_CONFIG.min_reliable_visits,
 ) -> OpeningLossFinding | None: ...
 ```
+
+`api/schemas.py`'s `ExplainOpeningRequest._sequence_matches_opening_window` validator also switches its import from `feature_extraction.config`'s `K_OPEN` to `feature_extraction.config_loader`'s `DEFAULT_CONFIG.k_open` — same value, just a different source module.
 
 Внутренние приватные хелперы (`_weak_score`, `_severity` и т.п. в каждом файле) читают параметры из переданного `config`, а не из модульных констант. `min_reliable_visits` — общий для всех трёх детекторов (используется в расчёте `confidence`), поэтому отдельный defaulted-параметр рядом с `config`, а не поле внутри каждого per-detector под-конфига (`WeakGroupConfig`/`MistakeConfig`/`OpeningLossConfig` не дублируют его). Harness, переключая `config`, передаёт и `min_reliable_visits` того же кандидата явно.
 
