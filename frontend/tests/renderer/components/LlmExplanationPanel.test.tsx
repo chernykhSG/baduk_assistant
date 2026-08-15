@@ -424,4 +424,33 @@ describe('LlmExplanationPanel', () => {
 
     expect(getByText('Разбор дебюта')).toBeTruthy()
   })
+
+  it('disables the opening button when the current node itself lacks analysis, even though the opening window is fully covered', () => {
+    // 11 moves on a 9x9 board: the opening window is floor(81*0.12)=9, so
+    // buildOpeningSequence only needs turns 0..9 (10 nodes) - it succeeds
+    // even though the current (leaf, turn-11) node lies past the window and
+    // has no analysis of its own.
+    const tree = parseSgf(
+      '(;GM[1]FF[4]SZ[9];B[ee];W[gg];B[cc];W[dd];B[ff];W[hh];B[bb];W[ib];B[gc];W[fd];B[ea])'
+    )
+    const leaf = findMainLineLeaf(tree)
+    const nodeIds = nodeIdsFromRootToNode(tree, leaf.id)
+    currentTree.value = tree
+    currentNodeId.value = leaf.id
+    analysisByTurn.value = new Map(
+      nodeIds.slice(0, 10).map((id, turn) => [
+        id,
+        {
+          id: String(turn),
+          moveInfos: [],
+          rootInfo: { winrate: 0.5, scoreLead: 5 - turn, visits: 1000 },
+          ownership: undefined
+        }
+      ])
+    )
+
+    const { getByText } = render(<LlmExplanationPanel />)
+
+    expect((getByText('Проанализировать дебют') as HTMLButtonElement).disabled).toBe(true)
+  })
 })

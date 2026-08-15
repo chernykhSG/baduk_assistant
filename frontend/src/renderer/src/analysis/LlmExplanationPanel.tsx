@@ -77,12 +77,12 @@ export function LlmExplanationPanel(): JSX.Element {
   const [openingErrorMessage, setOpeningErrorMessage] = useState<string | null>(null)
 
   const openingSequence = tree && nodeId !== null ? buildOpeningSequence(tree, nodeId, getBoardSize(tree)) : null
+  const analysisAtEnd = nodeId !== null ? analysisByTurn.value.get(nodeId) : undefined
 
   async function handleExplainOpening(): Promise<void> {
     if (!tree || nodeId === null || !openingSequence) return
-    const boardSize = getBoardSize(tree)
-    const analysisAtEnd = analysisByTurn.value.get(nodeId)
     if (!analysisAtEnd) return
+    const boardSize = getBoardSize(tree)
     setOpeningStatus('loading')
     setOpeningErrorMessage(null)
     try {
@@ -156,7 +156,7 @@ export function LlmExplanationPanel(): JSX.Element {
         </label>
         <button
           type="button"
-          disabled={!openingSequence || openingStatus === 'loading'}
+          disabled={!openingSequence || !analysisAtEnd || openingStatus === 'loading'}
           onClick={handleExplainOpening}
         >
           {openingStatus === 'loading' ? 'Анализирую...' : 'Проанализировать дебют'}
