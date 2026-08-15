@@ -1,6 +1,6 @@
 from pydantic import TypeAdapter
 
-from baduk_backend.feature_extraction.schemas import Finding, MistakeFinding, WeakGroupFinding
+from baduk_backend.feature_extraction.schemas import Finding, MistakeFinding, OpeningLossFinding, WeakGroupFinding
 
 _ADAPTER: TypeAdapter = TypeAdapter(Finding)
 
@@ -39,3 +39,18 @@ def test_finding_discriminates_mistake():
         }
     )
     assert isinstance(parsed, MistakeFinding)
+
+
+def test_finding_discriminates_opening_loss():
+    parsed = _ADAPTER.validate_python(
+        {
+            "finding_id": "f3",
+            "type": "opening_loss",
+            "color": "B",
+            "move_range": [1, 9],
+            "delta_score": 7.0,
+            "severity": "medium",
+            "confidence": 0.8,
+        }
+    )
+    assert isinstance(parsed, OpeningLossFinding)

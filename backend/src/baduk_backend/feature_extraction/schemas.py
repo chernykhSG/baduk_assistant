@@ -29,4 +29,16 @@ class MistakeFinding(BaseModel):
     confidence: float
 
 
-Finding = Annotated[Union[WeakGroupFinding, MistakeFinding], Field(discriminator="type")]
+class OpeningLossFinding(BaseModel):
+    finding_id: str
+    type: Literal["opening_loss"] = "opening_loss"
+    color: Literal["B", "W"]
+    move_range: tuple[int, int]
+    delta_score: float
+    severity: Literal["low", "medium", "high"]
+    confidence: float
+
+
+Finding = Annotated[
+    Union[WeakGroupFinding, MistakeFinding, OpeningLossFinding], Field(discriminator="type")
+]
