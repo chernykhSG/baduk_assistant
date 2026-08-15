@@ -163,7 +163,17 @@ export interface MistakeFinding {
   confidence: number
 }
 
-export type Finding = WeakGroupFinding | MistakeFinding
+export interface OpeningLossFinding {
+  finding_id: string
+  type: 'opening_loss'
+  color: 'B' | 'W'
+  move_range: [number, number]
+  delta_score: number
+  severity: 'low' | 'medium' | 'high'
+  confidence: number
+}
+
+export type Finding = WeakGroupFinding | MistakeFinding | OpeningLossFinding
 
 export interface Claim {
   text: string
@@ -194,6 +204,21 @@ export interface ExplainRequest {
   nextMove?: [string, string]
 }
 
+export interface OpeningTurnEval {
+  turnNumber: number
+  scoreLead: number
+  visits: number
+}
+
+export interface ExplainOpeningRequest {
+  moves: [string, string][]
+  boardXSize: number
+  boardYSize: number
+  color: 'B' | 'W'
+  openingSequence: OpeningTurnEval[]
+  analysisAtEnd: AnalyzeResponse
+}
+
 export interface RagCitation {
   doc_id: string
   title: string
@@ -220,6 +245,22 @@ export async function explainPosition(request: ExplainRequest): Promise<ExplainR
     const body = await response.json().catch(() => ({ detail: response.statusText }))
     throw new Error(
       `explainPosition failed (${response.status}): ${body.detail ?? response.statusText}`
+    )
+  }
+  return response.json()
+}
+
+export async function explainOpening(request: ExplainOpeningRequest): Promise<ExplainResponse> {
+  const { port, token } = await getConnection()
+  const response = await fetch(`http://127.0.0.1:${port}/api/explain/opening`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+    body: JSON.stringify(request)
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ detail: response.statusText }))
+    throw new Error(
+      `explainOpening failed (${response.status}): ${body.detail ?? response.statusText}`
     )
   }
   return response.json()

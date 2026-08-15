@@ -1,7 +1,8 @@
 import type GameTree from '@sabaki/immutable-gametree'
-import { getBoardSize, findMainLineLeaf, movesFromRootToNode } from './sgfLoader'
+import { getBoardSize, findMainLineLeaf, movesFromRootToNode, nodeIdsFromRootToNode } from './sgfLoader'
 import { GTP_COLUMNS } from './gtpColumns'
-import type { AnalyzeRequest, StreamAnalyzeRequest } from '../ipc/client'
+import { analysisByTurn } from '../state/appState'
+import type { AnalyzeRequest, StreamAnalyzeRequest, OpeningTurnEval } from '../ipc/client'
 
 export function sgfCoordToGtp(sgfCoord: string | null, boardSize: number): string {
   if (!sgfCoord) return 'pass'
@@ -69,4 +70,32 @@ export function buildStreamRequest(
     maxVisits: options.maxVisits,
     includeOwnership: true
   }
+}
+
+// Must match feature_extraction/config.py's K_OPEN exactly - the backend
+// validates that the opening sequence covers precisely this window and
+// rejects the request (422) otherwise, so any drift here makes the
+// "Проанализировать дебют" button unusable rather than silently wrong.
+const K_OPEN = 0.12
+
+export function buildOpeningSequence(
+  tree: GameTree,
+  nodeId: number,
+  boardSize: number
+): OpeningTurnEval[] | null {
+  const windowEnd = Math.floor(boardSize * boardSize * K_OPEN)
+  const nodeIds = nodeIdsFromRootToNode(tree, nodeId)
+  const windowLength = Math.min(windowEnd, nodeIds.length - 1) + 1
+
+  const sequence: OpeningTurnEval[] = []
+  for (let turnNumber = 0; turnNumber < windowLength; turnNumber++) {
+    const analysis = analysisByTurn.value.get(nodeIds[turnNumber])
+    if (!analysis) return null
+    sequence.push({
+      turnNumber,
+      scoreLead: analysis.rootInfo.scoreLead,
+      visits: analysis.rootInfo.visits
+    })
+  }
+  return sequence
 }

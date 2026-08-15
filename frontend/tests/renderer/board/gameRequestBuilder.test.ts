@@ -1,11 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { parseSgf, findMainLineLeaf } from '@renderer/board/sgfLoader'
+import { afterEach, describe, it, expect } from 'vitest'
+import { parseSgf, findMainLineLeaf, nodeIdsFromRootToNode } from '@renderer/board/sgfLoader'
 import {
   sgfCoordToGtp,
   mapSgfRules,
   buildAnalyzeRequest,
-  buildStreamRequest
+  buildStreamRequest,
+  buildOpeningSequence
 } from '@renderer/board/gameRequestBuilder'
+import { analysisByTurn } from '@renderer/state/appState'
+import type { AnalyzeResponse } from '@renderer/ipc/client'
 
 const fixtureContent = '(;GM[1]FF[4]SZ[19]KM[7.5]RU[Chinese];B[qd];W[dc];B[oq])'
 
@@ -75,5 +78,73 @@ describe('buildStreamRequest', () => {
     expect(request.turnNumbers).toEqual([0, 1, 2, 3])
     expect(request.rules).toBe('chinese')
     expect(request.komi).toBe(7.5)
+  })
+})
+
+function fakeAnalysis(scoreLead: number, visits: number): AnalyzeResponse {
+  return { id: 'x', moveInfos: [], rootInfo: { winrate: 0.5, scoreLead, visits }, ownership: undefined }
+}
+
+describe('buildOpeningSequence', () => {
+  afterEach(() => {
+    analysisByTurn.value = new Map()
+  })
+
+  it('collects a compact sequence for every turn in the opening window on a 9x9 board', () => {
+    // 9x9 board -> window = floor(81 * 0.12) = 9 turns; the fixture has
+    // exactly 9 moves.
+    const movesText = 'B[aa];W[bb];B[cc];W[dd];B[ee];W[ff];B[gg];W[hh];B[ia]'
+    const tree = parseSgf(`(;GM[1]FF[4]SZ[9];${movesText})`)
+    const leaf = findMainLineLeaf(tree)
+    const nodeIds = nodeIdsFromRootToNode(tree, leaf.id)
+    const map = new Map<number, AnalyzeResponse>()
+    nodeIds.forEach((id, turn) => map.set(id, fakeAnalysis(10 - turn, 1000)))
+    analysisByTurn.value = map
+
+    const sequence = buildOpeningSequence(tree, leaf.id, 9)
+
+    expect(sequence).toHaveLength(10) // turns 0..9
+    expect(sequence?.[0]).toEqual({ turnNumber: 0, scoreLead: 10, visits: 1000 })
+    expect(sequence?.[9]).toEqual({ turnNumber: 9, scoreLead: 1, visits: 1000 })
+  })
+
+  it('shrinks to the actual game length when the game is shorter than the opening window', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[aa];W[bb])')
+    const leaf = findMainLineLeaf(tree)
+    const nodeIds = nodeIdsFromRootToNode(tree, leaf.id)
+    const map = new Map<number, AnalyzeResponse>()
+    nodeIds.forEach((id, turn) => map.set(id, fakeAnalysis(5 - turn, 1000)))
+    analysisByTurn.value = map
+
+    const sequence = buildOpeningSequence(tree, leaf.id, 9)
+
+    expect(sequence).toHaveLength(3) // turns 0,1,2 - the game only has 2 moves
+  })
+
+  it('follows the path to the given node, not the main line', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[aa](;W[bb])(;W[cc]))')
+    const child = tree.root.children[0]
+    const variation = child.children[1]
+    analysisByTurn.value = new Map<number, AnalyzeResponse>([
+      [tree.root.id, fakeAnalysis(5, 1000)],
+      [child.id, fakeAnalysis(4, 1000)],
+      [variation.id, fakeAnalysis(3, 1000)]
+    ])
+
+    const sequence = buildOpeningSequence(tree, variation.id, 9)
+
+    expect(sequence).toEqual([
+      { turnNumber: 0, scoreLead: 5, visits: 1000 },
+      { turnNumber: 1, scoreLead: 4, visits: 1000 },
+      { turnNumber: 2, scoreLead: 3, visits: 1000 }
+    ])
+  })
+
+  it('returns null when analysis is missing for a node inside the window', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[aa];W[bb])')
+    const leaf = findMainLineLeaf(tree)
+    analysisByTurn.value = new Map<number, AnalyzeResponse>([[tree.root.id, fakeAnalysis(5, 1000)]]) // missing turns 1,2
+
+    expect(buildOpeningSequence(tree, leaf.id, 9)).toBeNull()
   })
 })
