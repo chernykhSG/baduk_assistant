@@ -89,9 +89,15 @@ RAG_TOP_K = 3
 
 
 def build_rag_query(finding: Finding) -> str:
-    if finding.type == "weak_group":
-        return "слабая группа камней с недостатком глаз и территории"
-    return f"ошибка хода, потеря очков на стадии {finding.stage}"
+    match finding.type:
+        case "weak_group":
+            return "слабая группа камней с недостатком глаз и территории"
+        case "mistake":
+            return f"ошибка хода, потеря очков на стадии {finding.stage}"
+        case "opening_loss":
+            return "ошибки в дебюте, потеря очков в начале партии"
+        case _:
+            raise AssertionError(f"unhandled finding type: {finding.type}")
 
 
 def build_user_prompt(finding: Finding, analysis: AnalyzeResponse, board_size: int) -> str:
@@ -100,23 +106,39 @@ def build_user_prompt(finding: Finding, analysis: AnalyzeResponse, board_size: i
         f"visits={analysis.rootInfo.visits}\n"
         "Объясни эту находку игроку через record_explanation."
     )
-    if finding.type == "weak_group":
-        color_ru = "чёрных" if finding.color == "B" else "белых"
-        coords = ", ".join(xy_to_gtp(x, y, board_size) for x, y in finding.stones)
-        return (
-            f"Находка о слабой группе {color_ru} (finding_id={finding.finding_id}):\n"
-            f"Камни группы: {coords}\n"
-            f"weak_score={finding.weak_score}, own_certainty={finding.own_certainty}, "
-            f"boundary_certainty={finding.boundary_certainty}, liberties={finding.liberties}, "
-            f"confidence={finding.confidence}, turn_number={finding.turn_number}\n"
-            f"{root}"
-        )
-    color_ru = "чёрных" if finding.color == "B" else "белых"
-    return (
-        f"Находка о ходе {color_ru} (finding_id={finding.finding_id}):\n"
-        f"Сыгранный ход: {finding.move} (ход №{finding.turn_number}, стадия: {finding.stage})\n"
-        f"delta_score={finding.delta_score}, confidence={finding.confidence}\n"
-        "(scoreLead и winrate - всегда с точки зрения чёрных; delta_score - потеря очков "
-        "для игрока, сделавшего ход)\n"
-        f"{root}"
-    )
+    match finding.type:
+        case "weak_group":
+            color_ru = "чёрных" if finding.color == "B" else "белых"
+            coords = ", ".join(xy_to_gtp(x, y, board_size) for x, y in finding.stones)
+            return (
+                f"Находка о слабой группе {color_ru} (finding_id={finding.finding_id}):\n"
+                f"Камни группы: {coords}\n"
+                f"weak_score={finding.weak_score}, own_certainty={finding.own_certainty}, "
+                f"boundary_certainty={finding.boundary_certainty}, liberties={finding.liberties}, "
+                f"confidence={finding.confidence}, turn_number={finding.turn_number}\n"
+                f"{root}"
+            )
+        case "mistake":
+            color_ru = "чёрных" if finding.color == "B" else "белых"
+            return (
+                f"Находка о ходе {color_ru} (finding_id={finding.finding_id}):\n"
+                f"Сыгранный ход: {finding.move} (ход №{finding.turn_number}, стадия: {finding.stage})\n"
+                f"delta_score={finding.delta_score}, confidence={finding.confidence}\n"
+                "(scoreLead и winrate - всегда с точки зрения чёрных; delta_score - потеря очков "
+                "для игрока, сделавшего ход)\n"
+                f"{root}"
+            )
+        case "opening_loss":
+            color_ru = "чёрных" if finding.color == "B" else "белых"
+            return (
+                f"Находка о накопленной потере очков {color_ru} в дебюте "
+                f"(finding_id={finding.finding_id}):\n"
+                f"Диапазон ходов: {finding.move_range[0]}-{finding.move_range[1]}\n"
+                f"delta_score={finding.delta_score} (суммарная потеря очков за диапазон), "
+                f"confidence={finding.confidence}\n"
+                "(scoreLead и winrate - всегда с точки зрения чёрных; delta_score - суммарная "
+                "потеря очков для игрока за диапазон ходов)\n"
+                f"{root}"
+            )
+        case _:
+            raise AssertionError(f"unhandled finding type: {finding.type}")

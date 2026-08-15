@@ -126,3 +126,30 @@ def test_rag_decision_tool_parameters_has_two_branches():
     finalize_branch = next(b for b in branches if b["properties"]["tool"]["const"] == "record_explanation")
     assert "rag_doc_id" in finalize_branch["properties"]
     assert set(finalize_branch["required"]) == {"tool", "summary", "claims"}
+
+
+from baduk_backend.feature_extraction.schemas import OpeningLossFinding
+
+
+def _opening_loss_finding() -> OpeningLossFinding:
+    return OpeningLossFinding(
+        finding_id="f3",
+        type="opening_loss",
+        color="B",
+        move_range=(1, 9),
+        delta_score=7.0,
+        severity="medium",
+        confidence=0.8,
+    )
+
+
+def test_build_user_prompt_for_opening_loss_mentions_range_color_and_delta():
+    prompt = build_user_prompt(_opening_loss_finding(), _analysis(), 9)
+    assert "delta_score=7.0" in prompt
+    assert "1-9" in prompt
+    assert "f3" in prompt
+
+
+def test_build_rag_query_for_opening_loss():
+    query = build_rag_query(_opening_loss_finding())
+    assert query == "ошибки в дебюте, потеря очков в начале партии"
