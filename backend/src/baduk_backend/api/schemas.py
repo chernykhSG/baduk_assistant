@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from baduk_backend.feature_extraction.config import K_OPEN
 from baduk_backend.feature_extraction.schemas import Finding
 from baduk_backend.llm.schemas import Explanation
 
@@ -85,6 +86,31 @@ class ExplainRequest(BaseModel):
     def _analysis_after_and_next_move_together(self) -> "ExplainRequest":
         if (self.analysisAfter is None) != (self.nextMove is None):
             raise ValueError("analysisAfter and nextMove must both be set or both be None")
+        return self
+
+
+class OpeningTurnEval(BaseModel):
+    turnNumber: int
+    scoreLead: float
+    visits: int
+
+
+class ExplainOpeningRequest(BaseModel):
+    moves: list[list[str]] = Field(default_factory=list)
+    boardXSize: int = Field(ge=2, le=25)
+    boardYSize: int = Field(ge=2, le=25)
+    color: Literal["B", "W"]
+    openingSequence: list[OpeningTurnEval]
+    analysisAtEnd: AnalyzeResponse
+
+    @model_validator(mode="after")
+    def _sequence_matches_opening_window(self) -> "ExplainOpeningRequest":
+        board_area = self.boardXSize * self.boardYSize
+        window_end = min(int(board_area * K_OPEN), len(self.moves))
+        expected_turns = list(range(window_end + 1))
+        got_turns = [t.turnNumber for t in self.openingSequence]
+        if got_turns != expected_turns:
+            raise ValueError(f"openingSequence must cover turns {expected_turns}, got {got_turns}")
         return self
 
 

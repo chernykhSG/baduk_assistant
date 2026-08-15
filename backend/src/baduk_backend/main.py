@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI
 
-from baduk_backend.api import analysis, explain
+from baduk_backend.api import analysis, explain, explain_opening
 from baduk_backend.auth import AUTH_TOKEN, require_valid_token
 from baduk_backend.config.profile import KataGoProfile, render_analysis_config
 from baduk_backend.engine_manager import EngineManager, build_katago_command
@@ -16,6 +16,7 @@ from baduk_backend.llm.orchestrator import LLMProvider
 app = FastAPI()
 app.include_router(analysis.router)
 app.include_router(explain.router)
+app.include_router(explain_opening.router)
 
 _DEFAULT_PROFILE = KataGoProfile(
     model_id="phase1-default",
