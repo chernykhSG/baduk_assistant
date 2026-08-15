@@ -10,13 +10,7 @@ from baduk_backend.feature_extraction.config import (
     THRESHOLD_MISTAKE,
 )
 from baduk_backend.feature_extraction.schemas import MistakeFinding
-
-
-def _mover_favorability(analysis: AnalyzeResponse, mover: str) -> float:
-    # rootInfo.scoreLead is always given from Black's perspective in this
-    # project (reportAnalysisWinratesAs = BLACK, see config/profile.py) -
-    # flip the sign to read it from the mover's own perspective.
-    return analysis.rootInfo.scoreLead if mover == "B" else -analysis.rootInfo.scoreLead
+from baduk_backend.feature_extraction.scoring import mover_favorability
 
 
 def _empty_points(board: list[list[str | None]]) -> int:
@@ -50,7 +44,9 @@ def detect_mistake(
     turn_number: int,
 ) -> MistakeFinding | None:
     mover, move = next_move
-    delta = _mover_favorability(analysis_before, mover) - _mover_favorability(analysis_after, mover)
+    delta = mover_favorability(analysis_before.rootInfo.scoreLead, mover) - mover_favorability(
+        analysis_after.rootInfo.scoreLead, mover
+    )
     # Guard against IEEE-754 rounding noise before the threshold/severity
     # comparisons below, same precaution as weak_group's _weak_score().
     delta = round(delta, 9)
