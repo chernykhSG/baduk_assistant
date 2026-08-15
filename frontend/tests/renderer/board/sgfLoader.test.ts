@@ -8,7 +8,8 @@ import {
   getBoardSize,
   findMainLineLeaf,
   mainLineNodeIds,
-  movesFromRootToNode
+  movesFromRootToNode,
+  nodeIdsFromRootToNode
 } from '@renderer/board/sgfLoader'
 
 const fixturePath = path.join(
@@ -91,5 +92,29 @@ describe('mainLineNodeIds', () => {
 
     expect(ids).toEqual([tree.root.id, bMoveNode.id, mainLineVariation.id])
     expect(ids).not.toContain(otherVariation.id)
+  })
+})
+
+describe('nodeIdsFromRootToNode', () => {
+  it('returns node ids along the path from root to the given node, root first', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee];W[gg])')
+    const child = tree.root.children[0]
+    const grandchild = child.children[0]
+
+    expect(nodeIdsFromRootToNode(tree, grandchild.id)).toEqual([tree.root.id, child.id, grandchild.id])
+  })
+
+  it('follows a variation branch, not the main line', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee](;W[gg])(;W[cc]))')
+    const child = tree.root.children[0]
+    const variation = child.children[1] // W[cc], the second branch
+
+    expect(nodeIdsFromRootToNode(tree, variation.id)).toEqual([tree.root.id, child.id, variation.id])
+  })
+
+  it('returns just the root when nodeId is the root', () => {
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9])')
+
+    expect(nodeIdsFromRootToNode(tree, tree.root.id)).toEqual([tree.root.id])
   })
 })

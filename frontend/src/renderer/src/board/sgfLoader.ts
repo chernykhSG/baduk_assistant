@@ -97,3 +97,17 @@ export function movesFromRootToNode(
   }
   return moves
 }
+
+/** Node ids along the path from root (index 0) to `nodeId` (last index) — index i is the node at turn i. Unlike mainLineNodeIds, this follows the actual path to `nodeId`, which may sit on a variation branch. */
+export function nodeIdsFromRootToNode(tree: GameTree, nodeId: number): number[] {
+  const path: NodeObject[] = []
+  let current: NodeObject | null = tree.get(nodeId)
+  while (current) {
+    path.unshift(current)
+    current =
+      current.parentId === null || current.parentId === undefined
+        ? null
+        : tree.get(current.parentId)
+  }
+  return path.map((node) => node.id)
+}
