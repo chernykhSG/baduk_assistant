@@ -2,15 +2,22 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, fireEvent, waitFor } from '@testing-library/preact'
 import { LlmExplanationPanel } from '@renderer/analysis/LlmExplanationPanel'
 import { currentTree, currentNodeId, analysisByTurn } from '@renderer/state/appState'
-import { parseSgf, findMainLineLeaf, mainLineNodeIds } from '@renderer/board/sgfLoader'
-import { explainPosition } from '@renderer/ipc/client'
+import {
+  parseSgf,
+  findMainLineLeaf,
+  mainLineNodeIds,
+  nodeIdsFromRootToNode
+} from '@renderer/board/sgfLoader'
+import { explainPosition, explainOpening } from '@renderer/ipc/client'
 import type { ExplainResponse } from '@renderer/ipc/client'
 
 vi.mock('@renderer/ipc/client', () => ({
-  explainPosition: vi.fn()
+  explainPosition: vi.fn(),
+  explainOpening: vi.fn()
 }))
 
 const mockExplainPosition = vi.mocked(explainPosition)
+const mockExplainOpening = vi.mocked(explainOpening)
 
 afterEach(() => {
   currentTree.value = null
@@ -35,6 +42,25 @@ function loadPosition(): void {
       }
     ]
   ])
+}
+
+function loadOpeningReadyPosition(): void {
+  const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee];W[gg])')
+  const leaf = findMainLineLeaf(tree)
+  const nodeIds = nodeIdsFromRootToNode(tree, leaf.id)
+  currentTree.value = tree
+  currentNodeId.value = leaf.id
+  analysisByTurn.value = new Map(
+    nodeIds.map((id, turn) => [
+      id,
+      {
+        id: String(turn),
+        moveInfos: [],
+        rootInfo: { winrate: 0.5, scoreLead: 5 - turn, visits: 1000 },
+        ownership: undefined
+      }
+    ])
+  )
 }
 
 describe('LlmExplanationPanel', () => {
@@ -349,5 +375,53 @@ describe('LlmExplanationPanel', () => {
       expect(getByText('Объяснение без цитаты')).toBeTruthy()
     })
     expect(container.querySelector('.llm-explanation-panel__citation')).toBeNull()
+  })
+
+  it('disables the opening button when opening-window analysis is incomplete', () => {
+    const { getByText } = render(<LlmExplanationPanel />)
+
+    expect((getByText('Проанализировать дебют') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('calls explainOpening with the selected color and shows the result', async () => {
+    loadOpeningReadyPosition()
+    mockExplainOpening.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Разбор дебюта', claims: [] },
+      verified: true,
+      message: null,
+      citation: null
+    })
+
+    const { getByText, getByLabelText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByLabelText('Белые'))
+    fireEvent.click(getByText('Проанализировать дебют'))
+
+    await waitFor(() => {
+      expect(getByText('Разбор дебюта')).toBeTruthy()
+    })
+    expect(mockExplainOpening).toHaveBeenCalledWith(expect.objectContaining({ color: 'W' }))
+  })
+
+  it('keeps the opening result when the current board position changes', async () => {
+    loadOpeningReadyPosition()
+    mockExplainOpening.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Разбор дебюта', claims: [] },
+      verified: true,
+      message: null,
+      citation: null
+    })
+
+    const { getByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Проанализировать дебют'))
+    await waitFor(() => {
+      expect(getByText('Разбор дебюта')).toBeTruthy()
+    })
+
+    const nodeIds = nodeIdsFromRootToNode(currentTree.value!, currentNodeId.value!)
+    currentNodeId.value = nodeIds[1] // navigate elsewhere - the per-move panel resets, the opening block must not
+
+    expect(getByText('Разбор дебюта')).toBeTruthy()
   })
 })

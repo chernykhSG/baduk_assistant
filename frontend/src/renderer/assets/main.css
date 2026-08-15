@@ -421,6 +421,20 @@ code {
   max-height: 40vh;
   overflow-y: auto;
 }
+.llm-explanation-panel__opening {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ev-c-text-2, #888);
+}
+.llm-explanation-panel__opening h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.llm-explanation-panel__opening label {
+  margin-right: 12px;
+  cursor: pointer;
+}
 .annotation-panel {
   padding: 8px;
 }
