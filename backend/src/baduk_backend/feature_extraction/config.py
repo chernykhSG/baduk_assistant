@@ -28,3 +28,15 @@ MISTAKE_SEVERITY_HIGH = 6.0
 MISTAKE_SEVERITY_MEDIUM = 1.5
 K_OPEN = 0.12
 K_END = 0.15
+
+# Константы детектора opening_loss.
+# Ни один внешний источник (в отличие от лестницы KaTrain у mistake) не даёт
+# готового ориентира для НАКОПЛЕННОЙ дебютной потери - эти числа простая
+# иллюстративная отправная точка, специально подобранная так, чтобы
+# THRESHOLD_OPENING_LOSS < OPENING_LOSS_SEVERITY_MEDIUM (иначе severity="low"
+# стал бы недостижимой веткой). Как и остальные пороги в этом файле, не
+# откалиброваны под этот проект - подбор через backtesting harness
+# запланирован отдельным будущим под-этапом.
+THRESHOLD_OPENING_LOSS = 3.0
+OPENING_LOSS_SEVERITY_MEDIUM = 5.0
+OPENING_LOSS_SEVERITY_HIGH = 15.0
