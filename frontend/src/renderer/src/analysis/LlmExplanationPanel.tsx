@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'preact/hooks'
 import type { JSX } from 'preact'
-import { currentTree, currentNodeId, currentMoveAnalysis, analysisByTurn } from '../state/appState'
+import {
+  currentTree,
+  currentNodeId,
+  currentMoveAnalysis,
+  analysisByTurn,
+  gameLoadSequence
+} from '../state/appState'
 import { getBoardSize, nodeIdsFromRootToNode } from '../board/sgfLoader'
 import type { NodeObject } from '../board/sgfLoader'
 import { gtpMoves, sgfCoordToGtp, buildOpeningSequence } from '../board/gameRequestBuilder'
@@ -79,15 +85,18 @@ export function LlmExplanationPanel(): JSX.Element {
   // Any previously fetched opening explanation is tied to whatever game was
   // loaded when the request was made, not to a specific board position
   // within it (deliberately - it must survive ordinary move navigation, see
-  // below). But loading a genuinely different SGF file makes it stale, so
-  // reset whenever `tree` itself changes to a new object (App.tsx assigns a
-  // fresh GameTree on every file load; ordinary navigation only changes
-  // `currentNodeId` and leaves the same `tree` reference in place).
+  // below) - and NOT to a specific `tree` object reference either, because
+  // ordinary in-game edits (AnnotationPanel's setComment, BoardView's
+  // markup tools) also reassign `currentTree.value` to a new object for the
+  // *same* game via tree.mutate(). Only a genuinely different SGF file
+  // being loaded should reset this, so key the reset off
+  // `gameLoadSequence`, which App.tsx's loadGame() increments exactly once
+  // per file load and which in-game tree.mutate() calls never touch.
   useEffect(() => {
     setOpeningStatus('idle')
     setOpeningResult(null)
     setOpeningErrorMessage(null)
-  }, [tree])
+  }, [gameLoadSequence.value])
 
   const windowNodeIds = tree && nodeId !== null ? nodeIdsFromRootToNode(tree, nodeId) : null
   const openingSequence = tree && nodeId !== null ? buildOpeningSequence(tree, nodeId, getBoardSize(tree)) : null
@@ -104,12 +113,15 @@ export function LlmExplanationPanel(): JSX.Element {
 
   async function handleExplainOpening(): Promise<void> {
     if (!tree || nodeId === null || !openingSequence || !analysisAtEnd) return
-    // Capture the game this specific request was made for, so that if the
-    // user loads a different SGF file before the response arrives, the
-    // stale response below can be detected and dropped instead of
-    // repopulating the panel with an explanation attributed to a game
-    // that's no longer open.
-    const requestedTree = tree
+    // Capture the game-load generation this specific request was made for,
+    // so that if the user loads a different SGF file before the response
+    // arrives, the stale response below can be detected and dropped
+    // instead of repopulating the panel with an explanation attributed to
+    // a game that's no longer open. Deliberately NOT keyed on the `tree`
+    // object reference - in-game edits (comments, board markup) also swap
+    // in a new `tree` object for the same game and must not be treated as
+    // "navigated away".
+    const requestedGameLoadSequence = gameLoadSequence.value
     const boardSize = getBoardSize(tree)
     setOpeningStatus('loading')
     setOpeningErrorMessage(null)
@@ -122,11 +134,11 @@ export function LlmExplanationPanel(): JSX.Element {
         openingSequence,
         analysisAtEnd
       })
-      if (currentTree.value !== requestedTree) return
+      if (gameLoadSequence.value !== requestedGameLoadSequence) return
       setOpeningResult(response)
       setOpeningStatus('done')
     } catch (err) {
-      if (currentTree.value !== requestedTree) return
+      if (gameLoadSequence.value !== requestedGameLoadSequence) return
       setOpeningErrorMessage(err instanceof Error ? err.message : 'Не удалось получить объяснение')
       setOpeningStatus('error')
     }

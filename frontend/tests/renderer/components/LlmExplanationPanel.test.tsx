@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, fireEvent, waitFor } from '@testing-library/preact'
 import { LlmExplanationPanel } from '@renderer/analysis/LlmExplanationPanel'
-import { currentTree, currentNodeId, analysisByTurn } from '@renderer/state/appState'
+import {
+  currentTree,
+  currentNodeId,
+  analysisByTurn,
+  gameLoadSequence
+} from '@renderer/state/appState'
 import {
   parseSgf,
   findMainLineLeaf,
@@ -23,6 +28,7 @@ afterEach(() => {
   currentTree.value = null
   currentNodeId.value = null
   analysisByTurn.value = new Map()
+  gameLoadSequence.value = 0
   vi.clearAllMocks()
 })
 
@@ -512,17 +518,48 @@ describe('LlmExplanationPanel', () => {
       expect(getByText('Разбор дебюта')).toBeTruthy()
     })
 
-    // Simulate loading an entirely different SGF file, as App.tsx does on
-    // file load: a fresh GameTree object (not just a different node within
-    // the same tree), a new current node, and fresh per-turn analysis.
+    // Simulate loading an entirely different SGF file, as App.tsx's
+    // loadGame() does on file load: a fresh GameTree object (not just a
+    // different node within the same tree), a new current node, fresh
+    // per-turn analysis, AND incrementing gameLoadSequence (the actual
+    // signal the reset effect is keyed on - see the next test for why
+    // `tree` reference alone is not a safe proxy for "a new game loaded").
     const otherTree = parseSgf('(;GM[1]FF[4]SZ[9];B[cc])')
     const otherLeaf = findMainLineLeaf(otherTree)
     currentTree.value = otherTree
     currentNodeId.value = otherLeaf.id
     analysisByTurn.value = new Map()
+    gameLoadSequence.value += 1
 
     await waitFor(() => {
       expect(queryByText('Разбор дебюта')).toBeNull()
     })
+  })
+
+  it('keeps the opening result across an in-game tree mutation (e.g. adding board markup or a comment)', async () => {
+    loadOpeningReadyPosition()
+    mockExplainOpening.mockResolvedValue({
+      finding: null,
+      explanation: { summary: 'Разбор дебюта', claims: [] },
+      verified: true,
+      message: null,
+      citation: null
+    })
+
+    const { getByText } = render(<LlmExplanationPanel />)
+    fireEvent.click(getByText('Проанализировать дебют'))
+    await waitFor(() => {
+      expect(getByText('Разбор дебюта')).toBeTruthy()
+    })
+
+    // Simulate what AnnotationPanel.tsx's setComment / BoardView.tsx's
+    // markup tools actually do: reassign currentTree.value to a new
+    // GameTree object produced by tree.mutate() for the SAME game -
+    // deliberately without touching gameLoadSequence, exactly as those
+    // components do. The opening result must NOT be wiped by this.
+    const mutatedTree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee];W[gg])')
+    currentTree.value = mutatedTree
+
+    expect(getByText('Разбор дебюта')).toBeTruthy()
   })
 })

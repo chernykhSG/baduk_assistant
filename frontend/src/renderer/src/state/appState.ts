@@ -12,6 +12,12 @@ export const streamStatus = signal<'idle' | 'streaming' | 'done' | 'error'>('idl
 export const streamError = signal<string | null>(null)
 export const currentFilePath = signal<string | null>(null)
 export const isDirty = signal<boolean>(false)
+// Increments exactly once per genuine SGF file load (see App.tsx's
+// loadGame()) - unlike `currentTree`, it stays stable across in-game
+// tree.mutate() calls (annotations, board markup), so it's the correct
+// dependency for state that must survive ordinary in-game edits but reset
+// on a new game being opened.
+export const gameLoadSequence = signal<number>(0)
 
 export const currentBoardPosition = computed(() => {
   const tree = currentTree.value

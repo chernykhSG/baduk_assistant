@@ -17,7 +17,8 @@ import {
   streamStatus,
   streamError,
   currentFilePath,
-  isDirty
+  isDirty,
+  gameLoadSequence
 } from './state/appState'
 import { selectedAnnotationTool, labelTextOverride } from './state/annotationToolState'
 
@@ -73,6 +74,7 @@ export function loadGame(content: string, filePath: string | null = null): void 
   selectedAnnotationTool.value = null
   labelTextOverride.value = null
   analysisByTurn.value = new Map()
+  gameLoadSequence.value += 1
   streamStatus.value = 'streaming'
   streamError.value = null
 
