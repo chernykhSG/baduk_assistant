@@ -2,6 +2,8 @@ import os
 
 import pytest
 
+pytest.importorskip("sgfmill")
+
 pytestmark = pytest.mark.integration
 
 

@@ -27,7 +27,12 @@ def _map_rules(raw: str | None) -> str:
 def load_game(sgf_path: Path) -> CalibrationGame:
     game = sgf.Sgf_game.from_bytes(sgf_path.read_bytes())
     board_size = game.get_size()
-    _, plays = sgf_moves.get_setup_and_moves(game)
+    setup_board, plays = sgf_moves.get_setup_and_moves(game)
+    if not setup_board.is_empty():
+        raise ValueError(
+            f"{sgf_path}: SGF has handicap/setup stones (AB/AW) before the first move - "
+            "not supported by the calibration harness"
+        )
 
     # format_vertex(None) already returns "pass" - no separate branch needed.
     moves = [[colour.upper(), format_vertex(move)] for colour, move in plays]

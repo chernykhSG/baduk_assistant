@@ -1,6 +1,7 @@
 import pytest
 
 from baduk_backend.api.schemas import AnalyzeResponse, RootInfo
+from baduk_backend.feature_extraction.config_loader import MistakeConfig
 from baduk_backend.feature_extraction.mistake import detect_mistake
 
 
@@ -49,6 +50,27 @@ def test_detect_mistake_white_good_move_returns_none():
     after = _analysis(score_lead=-8.0, visits=1000)  # improves White's favorability
 
     assert detect_mistake(board, before, after, ("W", "D4"), 9, 9, turn_number=30) is None
+
+
+def test_detect_mistake_explicit_config_overrides_default_threshold():
+    # Same input as test_detect_mistake_white_good_move_returns_none: White's
+    # favorability improves (delta == -3.0), below the default
+    # threshold_mistake (0.5), so detect_mistake() returns None with the
+    # default config. A candidate config with a much lower threshold_mistake
+    # must make the SAME input fire instead.
+    board = _empty_board(9)
+    before = _analysis(score_lead=-5.0, visits=1000)
+    after = _analysis(score_lead=-8.0, visits=1000)
+
+    low_threshold_config = MistakeConfig(threshold_mistake=-10.0, severity_high=6.0, severity_medium=1.5)
+
+    assert detect_mistake(board, before, after, ("W", "D4"), 9, 9, turn_number=30) is None
+    finding = detect_mistake(
+        board, before, after, ("W", "D4"), 9, 9, turn_number=30, config=low_threshold_config
+    )
+
+    assert finding is not None
+    assert finding.delta_score == pytest.approx(-3.0)
 
 
 def test_detect_mistake_threshold_boundary():

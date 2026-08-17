@@ -72,10 +72,11 @@ export function buildStreamRequest(
   }
 }
 
-// Must match feature_extraction/config.py's K_OPEN exactly - the backend
-// validates that the opening sequence covers precisely this window and
-// rejects the request (422) otherwise, so any drift here makes the
-// "Проанализировать дебют" button unusable rather than silently wrong.
+// Must match feature_extraction/detector_config.v1.json's "k_open" field
+// exactly - the backend validates that the opening sequence covers
+// precisely this window and rejects the request (422) otherwise, so any
+// drift here makes the "Проанализировать дебют" button unusable rather
+// than silently wrong.
 const K_OPEN = 0.12
 
 export function buildOpeningSequence(

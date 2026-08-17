@@ -2,14 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from baduk_backend.feature_extraction.calibration.games import CalibrationGame
-from baduk_backend.feature_extraction.calibration.self_consistency import (
+pytest.importorskip("sgfmill")
+
+from baduk_backend.feature_extraction.calibration.games import CalibrationGame  # noqa: E402
+from baduk_backend.feature_extraction.calibration.self_consistency import (  # noqa: E402
     classify_finding,
     evaluate_opening_loss,
     evaluate_weak_group_and_mistake,
 )
-from baduk_backend.feature_extraction.config_loader import DEFAULT_CONFIG
-from baduk_backend.feature_extraction.schemas import MistakeFinding, WeakGroupFinding
+from baduk_backend.feature_extraction.config_loader import DEFAULT_CONFIG  # noqa: E402
+from baduk_backend.feature_extraction.schemas import MistakeFinding, WeakGroupFinding  # noqa: E402
 
 
 def _weak_group_finding(stones):
@@ -128,6 +130,94 @@ def test_evaluate_opening_loss_runs_for_both_colors(tmp_path):
     )
 
     assert (result.tp, result.fp, result.fn, result.tn) != (0, 0, 0, 0)
+
+
+class _FlakyEngineManager:
+    """Like _FakeEngineManager, but raises RuntimeError on the Nth call
+    (1-indexed) to analyze() and succeeds on every other call - simulates
+    one bad/timed-out KataGo response amid otherwise-successful calls."""
+
+    def __init__(self, fail_on_call: int, score_lead: float = 0.0, visits: int = 1000):
+        self.fail_on_call = fail_on_call
+        self.score_lead = score_lead
+        self.visits = visits
+        self.calls = 0
+
+    def analyze(self, request: dict, timeout: float = 30.0) -> dict:
+        self.calls += 1
+        if self.calls == self.fail_on_call:
+            raise RuntimeError("simulated KataGo failure")
+        board_area = request["boardXSize"] * request["boardYSize"]
+        return {
+            "id": request["id"],
+            "moveInfos": [],
+            "rootInfo": {"winrate": 0.5, "scoreLead": self.score_lead, "visits": self.visits},
+            "ownership": [1.0] * board_area,
+        }
+
+
+def test_evaluate_weak_group_and_mistake_skips_a_failing_position_and_keeps_going(tmp_path, capsys):
+    bad_game = CalibrationGame(
+        moves=[["B", "E5"], ["W", "C3"], ["B", "G7"], ["W", "C7"], ["B", "E3"], ["W", "G3"]],
+        board_size=9,
+        rules="chinese",
+        komi=7.5,
+    )
+    good_game = CalibrationGame(
+        moves=[["B", "E5"], ["W", "C3"], ["B", "G7"], ["W", "C7"], ["B", "E3"], ["W", "G3"]],
+        board_size=9,
+        rules="chinese",
+        komi=7.5,
+    )
+    # Fails on the very first engine call, i.e. bad_game's single sampled
+    # position (turn 5); every later call (including all of good_game's)
+    # succeeds.
+    manager = _FlakyEngineManager(fail_on_call=1)
+
+    result = evaluate_weak_group_and_mistake(
+        [(Path("bad.sgf"), bad_game), (Path("good.sgf"), good_game)],
+        fast_visits=50, deep_visits=500,
+        config=DEFAULT_CONFIG, engine_manager=manager, stride=5, cache_dir=tmp_path,
+    )
+
+    # The evaluator must not crash or propagate the exception - it should
+    # skip bad_game's failing position and still count good_game's position
+    # normally (a clean TN for both detectors, same as the flat-scoreLead/
+    # fully-resolved-ownership case in the test above).
+    assert (result["weak_group"].tp, result["weak_group"].fp, result["weak_group"].fn) == (0, 0, 0)
+    assert result["weak_group"].tn == 1
+    assert (result["mistake"].tp, result["mistake"].fp, result["mistake"].fn) == (0, 0, 0)
+    assert result["mistake"].tn == 1
+    assert "bad.sgf" in capsys.readouterr().out
+
+
+def test_evaluate_opening_loss_skips_a_failing_game_color_and_keeps_going(tmp_path, capsys):
+    bad_game = CalibrationGame(
+        moves=[["B", "E5"], ["W", "C3"], ["B", "G7"], ["W", "C7"]],
+        board_size=9,
+        rules="chinese",
+        komi=7.5,
+    )
+    good_game = CalibrationGame(
+        moves=[["B", "E5"], ["W", "C3"], ["B", "G7"], ["W", "C7"]],
+        board_size=9,
+        rules="chinese",
+        komi=7.5,
+    )
+    # Fails on the very first engine call, i.e. bad_game's color="B" pass at
+    # turn 0; bad_game's color="W" pass and all of good_game's calls succeed.
+    manager = _FlakyEngineManager(fail_on_call=1)
+
+    result = evaluate_opening_loss(
+        [(Path("bad.sgf"), bad_game), (Path("good.sgf"), good_game)],
+        fast_visits=50, deep_visits=500,
+        config=DEFAULT_CONFIG, engine_manager=manager, cache_dir=tmp_path,
+    )
+
+    # The evaluator must not crash or propagate the exception - the
+    # remaining (sgf_path, color) combinations must still be counted.
+    assert (result.tp, result.fp, result.fn, result.tn) != (0, 0, 0, 0)
+    assert "bad.sgf" in capsys.readouterr().out
 
 
 def test_evaluate_opening_loss_reuses_cache_across_fast_and_deep_calls_of_the_same_budget(tmp_path):

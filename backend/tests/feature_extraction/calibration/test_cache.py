@@ -1,8 +1,12 @@
 import hashlib
 from pathlib import Path
 
-from baduk_backend.feature_extraction.calibration.cache import fetch_analysis, _cache_key
-from baduk_backend.feature_extraction.calibration.games import CalibrationGame
+import pytest
+
+pytest.importorskip("sgfmill")
+
+from baduk_backend.feature_extraction.calibration.cache import fetch_analysis, _cache_key  # noqa: E402
+from baduk_backend.feature_extraction.calibration.games import CalibrationGame  # noqa: E402
 
 
 class _FakeEngineManager:

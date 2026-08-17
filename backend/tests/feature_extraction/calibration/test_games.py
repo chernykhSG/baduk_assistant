@@ -1,6 +1,8 @@
 import pytest
 
-from baduk_backend.feature_extraction.calibration.games import load_game, sample_games, sample_positions
+pytest.importorskip("sgfmill")
+
+from baduk_backend.feature_extraction.calibration.games import load_game, sample_games, sample_positions  # noqa: E402
 
 # Same fixture moves already verified against real GTP output in
 # frontend/tests/renderer/board/gameRequestBuilder.test.ts's
@@ -38,6 +40,16 @@ def test_load_game_falls_back_to_chinese_for_unrecognized_rules(tmp_path):
     game = load_game(sgf_path)
 
     assert game.rules == "chinese"
+
+
+def test_load_game_raises_on_handicap_setup_stones(tmp_path):
+    sgf_path = tmp_path / "handicap.sgf"
+    sgf_path.write_text(
+        "(;GM[1]FF[4]SZ[19]HA[4]AB[dd][pd][dp][pp];W[qf])", encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match="handicap"):
+        load_game(sgf_path)
 
 
 def test_load_game_includes_pass_moves(tmp_path):

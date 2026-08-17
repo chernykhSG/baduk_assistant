@@ -1,7 +1,10 @@
+import importlib
 import json
 
+import pydantic
 import pytest
 
+from baduk_backend.feature_extraction import config_loader
 from baduk_backend.feature_extraction.config_loader import DetectorConfig, load_detector_config
 
 _VALID_CONFIG = {
@@ -53,3 +56,31 @@ def test_default_config_path_is_the_bundled_v1_file():
 
     assert DEFAULT_CONFIG_PATH.name == "detector_config.v1.json"
     assert DEFAULT_CONFIG.version == 1
+
+
+def test_load_detector_config_raises_on_non_positive_min_reliable_visits(tmp_path):
+    invalid = dict(_VALID_CONFIG)
+    invalid["min_reliable_visits"] = 0
+    path = tmp_path / "zero-min-reliable-visits.json"
+    path.write_text(json.dumps(invalid), encoding="utf-8")
+
+    with pytest.raises(pydantic.ValidationError):
+        load_detector_config(path)
+
+
+def test_baduk_detector_config_path_env_var_overrides_default_config(tmp_path, monkeypatch):
+    overridden = dict(_VALID_CONFIG)
+    overridden["k_open"] = 0.5  # distinctly different from the bundled default's 0.12
+    path = tmp_path / "override-config.json"
+    path.write_text(json.dumps(overridden), encoding="utf-8")
+
+    try:
+        monkeypatch.setenv("BADUK_DETECTOR_CONFIG_PATH", str(path))
+        importlib.reload(config_loader)
+
+        assert config_loader.DEFAULT_CONFIG.k_open == pytest.approx(0.5)
+    finally:
+        monkeypatch.delenv("BADUK_DETECTOR_CONFIG_PATH", raising=False)
+        importlib.reload(config_loader)
+        assert config_loader.DEFAULT_CONFIG.version == 1
+        assert config_loader.DEFAULT_CONFIG.k_open == pytest.approx(0.12)

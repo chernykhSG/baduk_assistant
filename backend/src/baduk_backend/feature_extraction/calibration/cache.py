@@ -45,7 +45,10 @@ def fetch_analysis(
         "maxVisits": max_visits,
         "includeOwnership": True,
     }
-    raw_response = engine_manager.analyze(request)
+    # A realistic --deep-visits value well above the harness's own 500
+    # default can routinely exceed the EngineManager.analyze() default
+    # timeout (30.0s) on a real KataGo instance - use a more generous one.
+    raw_response = engine_manager.analyze(request, timeout=120.0)
     response = AnalyzeResponse.model_validate(raw_response)
 
     cache_dir.mkdir(parents=True, exist_ok=True)

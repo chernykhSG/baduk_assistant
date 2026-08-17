@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from baduk_backend.feature_extraction.calibration.harness import _load_games_skipping_errors
+import pytest
+
+pytest.importorskip("sgfmill")
+
+from baduk_backend.feature_extraction.calibration.harness import _load_games_skipping_errors  # noqa: E402
 
 
 def test_load_games_skipping_errors_skips_a_malformed_file_and_keeps_the_rest(tmp_path, capsys):

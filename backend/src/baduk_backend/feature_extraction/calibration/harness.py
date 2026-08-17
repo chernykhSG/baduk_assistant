@@ -66,12 +66,15 @@ def run_harness(
     fast_visits: int,
     deep_visits: int,
 ) -> None:
+    # Sample/load the corpus before starting KataGo, so a missing/empty
+    # games_dir fails fast with a clear error instead of spinning up a
+    # KataGo process for nothing.
+    sgf_paths = sample_games(games_dir, n=games_sample, seed=seed)
+    games = _load_games_skipping_errors(sgf_paths)
+    print(f"Sampled {len(games)} games from {games_dir}")
+
     engine_manager, temp_config_path = _build_engine_manager()
     try:
-        sgf_paths = sample_games(games_dir, n=games_sample, seed=seed)
-        games = _load_games_skipping_errors(sgf_paths)
-        print(f"Sampled {len(games)} games from {games_dir}")
-
         for config_path in config_paths or [DEFAULT_CONFIG_PATH]:
             config = load_detector_config(config_path)
             print(f"\n=== {config_path} ===")

@@ -1,5 +1,6 @@
 import pytest
 
+from baduk_backend.feature_extraction.config_loader import OpeningLossConfig
 from baduk_backend.feature_extraction.opening_loss import detect_opening_loss
 
 
@@ -28,6 +29,25 @@ def test_detect_opening_loss_sums_only_the_requested_color_moves():
 
     white_finding = detect_opening_loss(moves, sequence, "W", 9, 9)
     assert white_finding is None  # White's own moves never lose points in this sequence
+
+
+def test_detect_opening_loss_explicit_config_overrides_default_threshold():
+    # Same input as test_detect_opening_loss_sums_only_the_requested_color_moves's
+    # White case: White's own moves never lose points (total delta == 0.0),
+    # below the default threshold_opening_loss (3.0), so detect_opening_loss()
+    # returns None for White with the default config. A candidate config with
+    # a much lower threshold_opening_loss must make the SAME input fire instead.
+    moves = _moves(["B", "W", "B", "W", "B", "W", "B", "W", "B"])
+    score_leads = [10.0, 9.0, 9.0, 7.0, 7.0, 6.0, 6.0, 3.0, 3.0, 3.0]
+    sequence = [(turn, score_leads[turn], 1000) for turn in range(10)]
+
+    low_threshold_config = OpeningLossConfig(threshold_opening_loss=-1.0, severity_medium=5.0, severity_high=15.0)
+
+    assert detect_opening_loss(moves, sequence, "W", 9, 9) is None
+    finding = detect_opening_loss(moves, sequence, "W", 9, 9, config=low_threshold_config)
+
+    assert finding is not None
+    assert finding.delta_score == pytest.approx(0.0)
 
 
 def test_detect_opening_loss_threshold_boundary():

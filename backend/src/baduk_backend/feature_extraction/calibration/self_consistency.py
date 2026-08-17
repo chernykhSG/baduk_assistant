@@ -58,34 +58,41 @@ def evaluate_weak_group_and_mistake(
 
     for sgf_path, game in games:
         for turn in sample_positions(len(game.moves), stride):
-            fast_after = fetch_analysis(engine_manager, sgf_path, game, turn, fast_visits, cache_dir)
-            deep_after = fetch_analysis(engine_manager, sgf_path, game, turn, deep_visits, cache_dir)
-            board_after = apply_moves(game.moves[:turn], game.board_size, game.board_size)
+            try:
+                fast_after = fetch_analysis(engine_manager, sgf_path, game, turn, fast_visits, cache_dir)
+                deep_after = fetch_analysis(engine_manager, sgf_path, game, turn, deep_visits, cache_dir)
+                board_after = apply_moves(game.moves[:turn], game.board_size, game.board_size)
 
-            candidate_wg = detect_weak_group(
-                board_after, game.board_size, game.board_size, fast_after, turn,
-                config.weak_group, config.min_reliable_visits,
-            )
-            reference_wg = detect_weak_group(
-                board_after, game.board_size, game.board_size, deep_after, turn,
-                config.weak_group, config.min_reliable_visits,
-            )
-            _accumulate(weak_group_counts, classify_finding(candidate_wg, reference_wg))
+                candidate_wg = detect_weak_group(
+                    board_after, game.board_size, game.board_size, fast_after, turn,
+                    config.weak_group, config.min_reliable_visits,
+                )
+                reference_wg = detect_weak_group(
+                    board_after, game.board_size, game.board_size, deep_after, turn,
+                    config.weak_group, config.min_reliable_visits,
+                )
+                weak_group_label = classify_finding(candidate_wg, reference_wg)
 
-            fast_before = fetch_analysis(engine_manager, sgf_path, game, turn - 1, fast_visits, cache_dir)
-            deep_before = fetch_analysis(engine_manager, sgf_path, game, turn - 1, deep_visits, cache_dir)
-            board_before = apply_moves(game.moves[: turn - 1], game.board_size, game.board_size)
-            next_move = (game.moves[turn - 1][0], game.moves[turn - 1][1])
+                fast_before = fetch_analysis(engine_manager, sgf_path, game, turn - 1, fast_visits, cache_dir)
+                deep_before = fetch_analysis(engine_manager, sgf_path, game, turn - 1, deep_visits, cache_dir)
+                board_before = apply_moves(game.moves[: turn - 1], game.board_size, game.board_size)
+                next_move = (game.moves[turn - 1][0], game.moves[turn - 1][1])
 
-            candidate_mistake = detect_mistake(
-                board_before, fast_before, fast_after, next_move, game.board_size, game.board_size, turn,
-                config.mistake, config.k_open, config.k_end, config.min_reliable_visits,
-            )
-            reference_mistake = detect_mistake(
-                board_before, deep_before, deep_after, next_move, game.board_size, game.board_size, turn,
-                config.mistake, config.k_open, config.k_end, config.min_reliable_visits,
-            )
-            _accumulate(mistake_counts, classify_finding(candidate_mistake, reference_mistake))
+                candidate_mistake = detect_mistake(
+                    board_before, fast_before, fast_after, next_move, game.board_size, game.board_size, turn,
+                    config.mistake, config.k_open, config.k_end, config.min_reliable_visits,
+                )
+                reference_mistake = detect_mistake(
+                    board_before, deep_before, deep_after, next_move, game.board_size, game.board_size, turn,
+                    config.mistake, config.k_open, config.k_end, config.min_reliable_visits,
+                )
+                mistake_label = classify_finding(candidate_mistake, reference_mistake)
+            except Exception as exc:
+                print(f"WARNING: skipping position sgf_path={sgf_path} turn={turn}: {exc}")
+                continue
+
+            _accumulate(weak_group_counts, weak_group_label)
+            _accumulate(mistake_counts, mistake_label)
 
     return {"weak_group": weak_group_counts, "mistake": mistake_counts}
 
@@ -105,22 +112,28 @@ def evaluate_opening_loss(
         window_end = min(int(board_area * config.k_open), len(game.moves))
 
         for color in ("B", "W"):
-            fast_sequence = []
-            deep_sequence = []
-            for turn in range(window_end + 1):
-                fast = fetch_analysis(engine_manager, sgf_path, game, turn, fast_visits, cache_dir)
-                deep = fetch_analysis(engine_manager, sgf_path, game, turn, deep_visits, cache_dir)
-                fast_sequence.append((turn, fast.rootInfo.scoreLead, fast.rootInfo.visits))
-                deep_sequence.append((turn, deep.rootInfo.scoreLead, deep.rootInfo.visits))
+            try:
+                fast_sequence = []
+                deep_sequence = []
+                for turn in range(window_end + 1):
+                    fast = fetch_analysis(engine_manager, sgf_path, game, turn, fast_visits, cache_dir)
+                    deep = fetch_analysis(engine_manager, sgf_path, game, turn, deep_visits, cache_dir)
+                    fast_sequence.append((turn, fast.rootInfo.scoreLead, fast.rootInfo.visits))
+                    deep_sequence.append((turn, deep.rootInfo.scoreLead, deep.rootInfo.visits))
 
-            candidate = detect_opening_loss(
-                game.moves, fast_sequence, color, game.board_size, game.board_size,
-                config.opening_loss, config.k_open, config.min_reliable_visits,
-            )
-            reference = detect_opening_loss(
-                game.moves, deep_sequence, color, game.board_size, game.board_size,
-                config.opening_loss, config.k_open, config.min_reliable_visits,
-            )
-            _accumulate(counts, classify_finding(candidate, reference))
+                candidate = detect_opening_loss(
+                    game.moves, fast_sequence, color, game.board_size, game.board_size,
+                    config.opening_loss, config.k_open, config.min_reliable_visits,
+                )
+                reference = detect_opening_loss(
+                    game.moves, deep_sequence, color, game.board_size, game.board_size,
+                    config.opening_loss, config.k_open, config.min_reliable_visits,
+                )
+                label = classify_finding(candidate, reference)
+            except Exception as exc:
+                print(f"WARNING: skipping opening_loss evaluation for sgf_path={sgf_path} color={color}: {exc}")
+                continue
+
+            _accumulate(counts, label)
 
     return counts

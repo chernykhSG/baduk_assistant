@@ -158,6 +158,55 @@ This is a manual, on-demand script — the backend service does not run it
 automatically — and every run does a full rebuild of `backend/rag_store/`
 (it is not incremental).
 
+## Running the calibration/backtesting harness (optional)
+
+This backtests the `weak_group`/`mistake`/`opening_loss` detectors against a
+corpus of real `.sgf` games, using a self-consistency proxy (fast-visits vs.
+deep-visits KataGo passes) to report precision/recall/F1 per detector for
+any candidate `detector_config.v{N}.json`. It requires the `calibration`
+optional-dependency group (`sgfmill`):
+
+```powershell
+.venv\Scripts\python.exe -m pip install -e ".[calibration]"
+```
+
+Set `BADUK_CALIBRATION_GAMES_PATH` to point at the root of a local directory
+of `.sgf` files (e.g. a personal game corpus — never commit a real path):
+
+```powershell
+$env:BADUK_CALIBRATION_GAMES_PATH = "C:/path/to/your/sgf/corpus"
+```
+
+Optionally, set `BADUK_DETECTOR_CONFIG_PATH` to override which
+`detector_config.v{N}.json` the module-level `DEFAULT_CONFIG` loads at
+import time. This is meant for this harness's own use, not for a live
+backend process — see the comment above `DEFAULT_CONFIG` in
+`feature_extraction/config_loader.py` for the desync risk against the
+frontend's hardcoded `K_OPEN` constant if used otherwise.
+
+Then run the harness from within `backend/` (also requires
+`BADUK_KATAGO_BINARY`/`BADUK_KATAGO_MODEL`, same as the main backend
+service):
+
+```powershell
+.venv\Scripts\python.exe -m baduk_backend.feature_extraction.calibration.harness
+```
+
+Optional flags (all have defaults, see `harness.py`'s `main()`):
+- `--games-sample` — number of games to sample from the corpus (default `20`).
+- `--move-stride` — sample one position every N moves (default `5`).
+- `--seed` — RNG seed for deterministic game sampling (default `0`).
+- `--fast-visits` — KataGo `maxVisits` for the fast/candidate pass (default `50`).
+- `--deep-visits` — KataGo `maxVisits` for the deep/reference pass (default `500`).
+- `--config` — path to a candidate `detector_config.v{N}.json` to evaluate;
+  repeatable to compare several candidates in one run; defaults to the
+  bundled `detector_config.v1.json` when omitted.
+
+This is a manual, offline dev tool (not a user-facing feature) — it prints a
+precision/recall/F1 table per detector to stdout and does not modify any
+`detector_config.v{N}.json` file itself; picking a new default config based
+on the results is a separate, manual step.
+
 ## API
 
 - `POST /api/analyze` — анализ одной позиции. Тело запроса и ответ — см.
