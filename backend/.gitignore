@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 tests/local_config.json
 rag_store/
+calibration_cache/
