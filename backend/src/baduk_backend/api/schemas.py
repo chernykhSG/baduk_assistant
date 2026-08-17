@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from baduk_backend.feature_extraction.config import K_OPEN
+from baduk_backend.feature_extraction.config_loader import DEFAULT_CONFIG
 from baduk_backend.feature_extraction.schemas import Finding
 from baduk_backend.llm.schemas import Explanation
 
@@ -106,7 +106,7 @@ class ExplainOpeningRequest(BaseModel):
     @model_validator(mode="after")
     def _sequence_matches_opening_window(self) -> "ExplainOpeningRequest":
         board_area = self.boardXSize * self.boardYSize
-        window_end = min(int(board_area * K_OPEN), len(self.moves))
+        window_end = min(int(board_area * DEFAULT_CONFIG.k_open), len(self.moves))
         expected_turns = list(range(window_end + 1))
         got_turns = [t.turnNumber for t in self.openingSequence]
         if got_turns != expected_turns:

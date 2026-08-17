@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "weak_group": {
+    "w1_own_certainty": 0.4,
+    "w2_boundary_certainty": 0.3,
+    "w3_pv_focus": 0.2,
+    "w4_liberties": 0.1,
+    "max_liberties_norm": 8,
+    "threshold_weak": 0.5,
+    "pv_focus_top_k": 5,
+    "pv_focus_distance_d": 2
+  },
+  "mistake": {
+    "threshold_mistake": 0.5,
+    "severity_high": 6.0,
+    "severity_medium": 1.5
+  },
+  "opening_loss": {
+    "threshold_opening_loss": 3.0,
+    "severity_medium": 5.0,
+    "severity_high": 15.0
+  },
+  "k_open": 0.12,
+  "k_end": 0.15,
+  "min_reliable_visits": 500
+}
