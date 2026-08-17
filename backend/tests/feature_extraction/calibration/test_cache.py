@@ -1,6 +1,7 @@
+import hashlib
 from pathlib import Path
 
-from baduk_backend.feature_extraction.calibration.cache import fetch_analysis
+from baduk_backend.feature_extraction.calibration.cache import fetch_analysis, _cache_key
 from baduk_backend.feature_extraction.calibration.games import CalibrationGame
 
 
@@ -81,3 +82,23 @@ def test_fetch_analysis_sends_the_full_move_list_and_requested_turn(tmp_path):
     assert captured["includeOwnership"] is True
     assert captured["boardXSize"] == 9
     assert captured["rules"] == "chinese"
+
+
+def test_fetch_analysis_handles_corrupted_cache_file(tmp_path):
+    """Verify that a corrupted/partial cache file is treated as a cache miss and the engine is called."""
+    manager = _FakeEngineManager(_fake_response())
+    game = _game()
+
+    # Pre-create a corrupted cache file at the expected location
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    cache_file = tmp_path / f"{_cache_key(Path('game.sgf'), 1, 50)}.json"
+    cache_file.write_text("{invalid json", encoding="utf-8")
+
+    # fetch_analysis should treat the corrupted file as a cache miss, call the engine, and fix the cache
+    response = fetch_analysis(manager, Path("game.sgf"), game, 1, 50, cache_dir=tmp_path)
+
+    assert manager.calls == 1
+    assert response.rootInfo.visits == 100
+    # Verify the cache file was overwritten with valid JSON
+    assert cache_file.exists()
+    assert cache_file.read_text(encoding="utf-8")  # Should be valid JSON now

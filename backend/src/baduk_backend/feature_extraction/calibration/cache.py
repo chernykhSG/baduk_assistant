@@ -1,6 +1,11 @@
 import hashlib
+import json
+import os
+import tempfile
 import uuid
 from pathlib import Path
+
+from pydantic import ValidationError
 
 from baduk_backend.api.schemas import AnalyzeResponse
 from baduk_backend.feature_extraction.calibration.games import CalibrationGame
@@ -23,7 +28,11 @@ def fetch_analysis(
 ) -> AnalyzeResponse:
     cache_file = cache_dir / f"{_cache_key(sgf_path, turn_number, max_visits)}.json"
     if cache_file.exists():
-        return AnalyzeResponse.model_validate_json(cache_file.read_text(encoding="utf-8"))
+        try:
+            return AnalyzeResponse.model_validate_json(cache_file.read_text(encoding="utf-8"))
+        except (ValidationError, json.JSONDecodeError, OSError):
+            # Cache file is corrupted or partially written; treat as miss and re-fetch
+            pass
 
     request = {
         "id": str(uuid.uuid4()),
@@ -40,5 +49,17 @@ def fetch_analysis(
     response = AnalyzeResponse.model_validate(raw_response)
 
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(response.model_dump_json(), encoding="utf-8")
+
+    # Write atomically: write to temp file first, then rename
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        dir=cache_dir,
+        delete=False,
+        encoding="utf-8",
+        suffix=".json",
+    ) as tmp_file:
+        tmp_file.write(response.model_dump_json())
+        tmp_path = tmp_file.name
+
+    os.replace(tmp_path, cache_file)
     return response
