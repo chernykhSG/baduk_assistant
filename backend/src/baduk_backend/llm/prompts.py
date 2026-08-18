@@ -142,3 +142,91 @@ def build_user_prompt(finding: Finding, analysis: AnalyzeResponse, board_size: i
             )
         case _:
             raise AssertionError(f"unhandled finding type: {finding.type}")
+
+
+ASK_SYSTEM_PROMPT = """\
+Ты - тренер по игре в го, отвечающий на вопрос игрока кю-уровня о текущей \
+позиции на русском языке. Тебе даны числа из анализа KataGo для этой позиции \
+и, возможно, для нескольких ходов-кандидатов. Правила:
+1. Обязательно цитируй числа только из переданных данных через инструмент \
+record_answer - никогда не выдумывай новые числа.
+2. Каждое утверждение (claim) должно ссылаться на конкретное поле (winrate, \
+scoreLead, visits или prior) и точное число из данных; если утверждение о \
+конкретном ходе-кандидате, укажи его координату в cited_move, иначе оставь \
+cited_move пустым (null) - тогда утверждение сверяется с общей оценкой позиции.
+3. Отвечай по существу вопроса игрока, не уходи в сторону.
+4. Никогда не переоценивай позицию против чисел KataGo - твоя роль объяснить \
+то, что уже посчитал движок, а не заново оценить позицию.
+"""
+
+ANSWER_TOOL_PARAMETERS = {
+    "type": "object",
+    "properties": {
+        "answer": {"type": "string", "description": "Ответ на вопрос игрока на русском."},
+        "claims": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "cited_field": {
+                        "type": "string",
+                        "enum": ["winrate", "scoreLead", "visits", "prior"],
+                    },
+                    "cited_number": {"type": "number"},
+                    "cited_move": {"type": ["string", "null"]},
+                },
+                "required": ["cited_field", "cited_number"],
+            },
+        },
+    },
+    "required": ["answer", "claims"],
+}
+
+ANSWER_WITH_RAG_TOOL_PARAMETERS = {
+    "type": "object",
+    "properties": {
+        **ANSWER_TOOL_PARAMETERS["properties"],  # answer, claims
+        "rag_doc_id": {"type": ["string", "null"]},
+    },
+    "required": ["answer", "claims"],
+}
+
+ASK_DECISION_TOOL_PARAMETERS = {
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {"tool": {"const": "retrieve_knowledge"}},
+            "required": ["tool"],
+        },
+        {
+            "type": "object",
+            "properties": {
+                "tool": {"const": "record_answer"},
+                **ANSWER_WITH_RAG_TOOL_PARAMETERS["properties"],
+            },
+            "required": ["tool", "answer", "claims"],
+        },
+    ]
+}
+
+# Cap on how many candidate moves are rendered into the prompt - moveInfos is
+# already sorted by KataGo's own ranking (most-visited first), the same
+# assumption feature_extraction/weak_group.py's pv_focus_top_k relies on.
+ASK_TOP_MOVE_INFOS = 5
+
+
+def build_ask_user_prompt(question: str, analysis: AnalyzeResponse, board_size: int) -> str:
+    root = (
+        f"rootInfo (общая оценка позиции): winrate={analysis.rootInfo.winrate}, "
+        f"scoreLead={analysis.rootInfo.scoreLead}, visits={analysis.rootInfo.visits}\n"
+    )
+    top_moves = analysis.moveInfos[:ASK_TOP_MOVE_INFOS]
+    if top_moves:
+        move_lines = [
+            f"- {m.move}: winrate={m.winrate}, scoreLead={m.scoreLead}, visits={m.visits}, prior={m.prior}"
+            for m in top_moves
+        ]
+        moves_block = "Ходы-кандидаты (moveInfos):\n" + "\n".join(move_lines) + "\n"
+    else:
+        moves_block = ""
+    return f"{root}{moves_block}Вопрос игрока: {question}\nОтветь на вопрос через record_answer."
