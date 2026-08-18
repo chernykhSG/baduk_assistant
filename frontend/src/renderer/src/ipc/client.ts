@@ -265,3 +265,32 @@ export async function explainOpening(request: ExplainOpeningRequest): Promise<Ex
   }
   return response.json()
 }
+
+export interface AskRequest {
+  moves: [string, string][]
+  boardXSize: number
+  boardYSize: number
+  analysis: AnalyzeResponse
+  question: string
+}
+
+export interface AskResponse {
+  answer: string | null
+  verified: boolean | null
+  message: string | null
+  citation: RagCitation | null
+}
+
+export async function askQuestion(request: AskRequest): Promise<AskResponse> {
+  const { port, token } = await getConnection()
+  const response = await fetch(`http://127.0.0.1:${port}/api/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+    body: JSON.stringify(request)
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ detail: response.statusText }))
+    throw new Error(`askQuestion failed (${response.status}): ${body.detail ?? response.statusText}`)
+  }
+  return response.json()
+}

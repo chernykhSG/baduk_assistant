@@ -13,16 +13,18 @@ import {
   mainLineNodeIds,
   nodeIdsFromRootToNode
 } from '@renderer/board/sgfLoader'
-import { explainPosition, explainOpening } from '@renderer/ipc/client'
-import type { ExplainResponse } from '@renderer/ipc/client'
+import { explainPosition, explainOpening, askQuestion } from '@renderer/ipc/client'
+import type { ExplainResponse, AskResponse } from '@renderer/ipc/client'
 
 vi.mock('@renderer/ipc/client', () => ({
   explainPosition: vi.fn(),
-  explainOpening: vi.fn()
+  explainOpening: vi.fn(),
+  askQuestion: vi.fn()
 }))
 
 const mockExplainPosition = vi.mocked(explainPosition)
 const mockExplainOpening = vi.mocked(explainOpening)
+const mockAskQuestion = vi.mocked(askQuestion)
 
 afterEach(() => {
   currentTree.value = null
@@ -561,5 +563,82 @@ describe('LlmExplanationPanel', () => {
     currentTree.value = mutatedTree
 
     expect(getByText('Разбор дебюта')).toBeTruthy()
+  })
+
+  it('disables the ask button when the question field is empty', () => {
+    loadPosition()
+    const { getByText } = render(<LlmExplanationPanel />)
+    expect((getByText('Спросить') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows a verified answer after a successful ask', async () => {
+    loadPosition()
+    mockAskQuestion.mockResolvedValue({
+      answer: 'Winrate сейчас 60%.',
+      verified: true,
+      message: null,
+      citation: null
+    } satisfies AskResponse)
+
+    const { getByText, getByPlaceholderText } = render(<LlmExplanationPanel />)
+    fireEvent.input(getByPlaceholderText('Задайте вопрос про текущую позицию...'), {
+      target: { value: 'какой сейчас winrate?' }
+    })
+    fireEvent.click(getByText('Спросить'))
+
+    await waitFor(() => {
+      expect(getByText('Winrate сейчас 60%.')).toBeTruthy()
+    })
+  })
+
+  it('shows an error message when askQuestion rejects', async () => {
+    loadPosition()
+    mockAskQuestion.mockRejectedValue(new Error('askQuestion failed (503): доступно только с llama'))
+
+    const { getByText, getByPlaceholderText } = render(<LlmExplanationPanel />)
+    fireEvent.input(getByPlaceholderText('Задайте вопрос про текущую позицию...'), {
+      target: { value: 'вопрос' }
+    })
+    fireEvent.click(getByText('Спросить'))
+
+    await waitFor(() => {
+      expect(getByText(/доступно только с llama/)).toBeTruthy()
+    })
+  })
+
+  it('resets the ask result when the current position changes', async () => {
+    // Mirrors the existing 'clears a stale explanation when the current
+    // position changes' test above exactly: two real nodes, each with its
+    // own analysisByTurn entry, navigate via currentNodeId.value, and assert
+    // through waitFor (the reset runs inside a useEffect, not synchronously).
+    const tree = parseSgf('(;GM[1]FF[4]SZ[9];B[ee];W[gg])')
+    const [, nodeA, nodeB] = mainLineNodeIds(tree)
+    currentTree.value = tree
+    currentNodeId.value = nodeA
+    analysisByTurn.value = new Map([
+      [nodeA, { id: 'a', moveInfos: [], rootInfo: { winrate: 0.6, scoreLead: 1, visits: 100 }, ownership: new Array(81).fill(0) }],
+      [nodeB, { id: 'b', moveInfos: [], rootInfo: { winrate: 0.4, scoreLead: -1, visits: 100 }, ownership: new Array(81).fill(0) }]
+    ])
+    mockAskQuestion.mockResolvedValue({
+      answer: 'Ответ про первую позицию',
+      verified: true,
+      message: null,
+      citation: null
+    } satisfies AskResponse)
+
+    const { getByText, getByPlaceholderText, queryByText } = render(<LlmExplanationPanel />)
+    fireEvent.input(getByPlaceholderText('Задайте вопрос про текущую позицию...'), {
+      target: { value: 'вопрос' }
+    })
+    fireEvent.click(getByText('Спросить'))
+    await waitFor(() => expect(getByText('Ответ про первую позицию')).toBeTruthy())
+
+    // Navigate to a different position (B) that also has its own analysis
+    // available, without clicking "ask" again.
+    currentNodeId.value = nodeB
+
+    await waitFor(() => {
+      expect(queryByText('Ответ про первую позицию')).toBeNull()
+    })
   })
 })

@@ -10,8 +10,8 @@ import {
 import { getBoardSize, nodeIdsFromRootToNode } from '../board/sgfLoader'
 import type { NodeObject } from '../board/sgfLoader'
 import { gtpMoves, sgfCoordToGtp, buildOpeningSequence } from '../board/gameRequestBuilder'
-import { explainPosition, explainOpening } from '../ipc/client'
-import type { ExplainResponse } from '../ipc/client'
+import { explainPosition, explainOpening, askQuestion } from '../ipc/client'
+import type { ExplainResponse, AskResponse } from '../ipc/client'
 
 export function LlmExplanationPanel(): JSX.Element {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -74,6 +74,44 @@ export function LlmExplanationPanel(): JSX.Element {
       if (currentNodeId.value !== requestedNodeId) return
       setErrorMessage(err instanceof Error ? err.message : 'Не удалось получить объяснение')
       setStatus('error')
+    }
+  }
+
+  const [question, setQuestion] = useState('')
+  const [askStatus, setAskStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [askResult, setAskResult] = useState<AskResponse | null>(null)
+  const [askErrorMessage, setAskErrorMessage] = useState<string | null>(null)
+
+  // Same reasoning as the reset effect above for the "explain this position"
+  // block: an answer is only valid for the position it was asked about.
+  useEffect(() => {
+    setAskStatus('idle')
+    setAskResult(null)
+    setAskErrorMessage(null)
+  }, [nodeId])
+
+  async function handleAsk(): Promise<void> {
+    if (!tree || nodeId === null || !analysis || !question.trim()) return
+    const requestedNodeId = nodeId
+    setAskStatus('loading')
+    setAskErrorMessage(null)
+    try {
+      const boardSize = getBoardSize(tree)
+      const moves = gtpMoves(tree, requestedNodeId, boardSize)
+      const response = await askQuestion({
+        moves,
+        boardXSize: boardSize,
+        boardYSize: boardSize,
+        analysis,
+        question: question.trim()
+      })
+      if (currentNodeId.value !== requestedNodeId) return
+      setAskResult(response)
+      setAskStatus('done')
+    } catch (err) {
+      if (currentNodeId.value !== requestedNodeId) return
+      setAskErrorMessage(err instanceof Error ? err.message : 'Не удалось получить ответ')
+      setAskStatus('error')
     }
   }
 
@@ -176,6 +214,52 @@ export function LlmExplanationPanel(): JSX.Element {
           )}
         </>
       )}
+      <div class="llm-explanation-panel__ask">
+        <h3>Вопрос</h3>
+        <textarea
+          placeholder="Задайте вопрос про текущую позицию..."
+          value={question}
+          onInput={(e) => setQuestion((e.target as HTMLTextAreaElement).value)}
+        />
+        <button
+          type="button"
+          disabled={!analysis || !question.trim() || askStatus === 'loading'}
+          onClick={handleAsk}
+        >
+          {askStatus === 'loading' ? 'Спрашиваю...' : 'Спросить'}
+        </button>
+        {askStatus === 'error' && <div class="llm-explanation-panel__error">{askErrorMessage}</div>}
+        {askStatus === 'done' && askResult?.message && (
+          <div class="llm-explanation-panel__message">{askResult.message}</div>
+        )}
+        {askStatus === 'done' && askResult?.answer && (
+          <>
+            <div
+              class={
+                askResult.verified
+                  ? 'llm-explanation-panel__verified llm-explanation-panel__verified--true'
+                  : 'llm-explanation-panel__verified llm-explanation-panel__verified--false'
+              }
+            >
+              {askResult.verified ? 'Проверено' : 'Не удалось проверить численно'}
+            </div>
+            <div class="llm-explanation-panel__summary">{askResult.answer}</div>
+            {askResult.citation && (
+              <details class="llm-explanation-panel__citation">
+                <summary>
+                  {askResult.citation.title}{' '}
+                  <span class="llm-explanation-panel__citation-source">
+                    ({askResult.citation.source})
+                  </span>
+                </summary>
+                <div class="llm-explanation-panel__citation-text">
+                  {askResult.citation.text_snippet}
+                </div>
+              </details>
+            )}
+          </>
+        )}
+      </div>
       <div class="llm-explanation-panel__opening">
         <h3>Дебют</h3>
         <label>
