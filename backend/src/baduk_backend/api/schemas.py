@@ -127,3 +127,28 @@ class ExplainResponse(BaseModel):
     verified: bool | None = None
     message: str | None = None
     citation: RagCitation | None = None
+
+
+class AskRequest(BaseModel):
+    moves: list[list[str]] = Field(default_factory=list)
+    boardXSize: int = Field(ge=2, le=25)
+    boardYSize: int = Field(ge=2, le=25)
+    analysis: AnalyzeResponse
+    question: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _ownership_matches_board_size(self) -> "AskRequest":
+        ownership = self.analysis.ownership
+        if ownership is not None and len(ownership) != self.boardXSize * self.boardYSize:
+            raise ValueError(
+                "analysis.ownership length must equal boardXSize * boardYSize "
+                f"({self.boardXSize * self.boardYSize}), got {len(ownership)}"
+            )
+        return self
+
+
+class AskResponse(BaseModel):
+    answer: str | None = None
+    verified: bool | None = None
+    message: str | None = None
+    citation: RagCitation | None = None
