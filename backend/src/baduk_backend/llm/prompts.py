@@ -57,6 +57,13 @@ RAG_SEARCH_INSTRUCTIONS = """\
 связи с базой знаний нет - отвечай record_explanation сразу, без поиска.
 """
 
+ASK_RAG_SEARCH_INSTRUCTIONS = """\
+У тебя есть доступ к базе знаний Го через retrieve_knowledge. Если вопрос \
+игрока напоминает известный принцип или распространённую тему, поиск поможет \
+дать более обоснованный ответ. Если сомневаешься - лучше поискать. Если явной \
+связи с базой знаний нет - отвечай record_answer сразу, без поиска.
+"""
+
 EXPLANATION_WITH_RAG_TOOL_PARAMETERS = {
     "type": "object",
     "properties": {

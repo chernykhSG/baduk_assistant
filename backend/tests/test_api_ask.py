@@ -108,3 +108,171 @@ def test_ask_returns_503_when_provider_raises():
 
     assert response.status_code == 503
     assert "model process crashed" in response.json()["detail"]
+
+
+class _AlwaysWrongAskProvider:
+    def answer_question(self, question, analysis, board_size, corrections=None):
+        return QuestionAnswer(
+            answer="...", claims=[QuestionClaim(cited_field="winrate", cited_number=999.0)]
+        )
+
+
+def test_ask_returns_200_with_fallback_after_exhausting_retries():
+    from fastapi.testclient import TestClient
+
+    from baduk_backend.main import app
+
+    app.state.llm_provider = _AlwaysWrongAskProvider()
+    try:
+        client = TestClient(app)
+        response = client.post("/api/ask", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload())
+    finally:
+        del app.state.llm_provider
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["verified"] is False
+    assert body["answer"] is not None
+
+
+class _CitingAskProvider:
+    def answer_question(self, question, analysis, board_size, corrections=None):
+        return QuestionAnswer(
+            answer="Тестовый ответ",
+            claims=[QuestionClaim(cited_field="winrate", cited_number=analysis.rootInfo.winrate)],
+            rag_doc_id="two-eyes-necessary",
+        )
+
+
+def test_ask_includes_citation_when_rag_doc_id_is_set(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from baduk_backend.main import app
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_get_snippet_by_id(doc_id, **kwargs):
+        assert doc_id == "two-eyes-necessary"
+        return RagSnippet(
+            doc_id="two-eyes-necessary",
+            title="Два глаза",
+            source="principles/two-eyes.md",
+            text_snippet="Группа с двумя глазами не может быть захвачена.",
+            relevance_score=1.0,
+        )
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.get_snippet_by_id", fake_get_snippet_by_id)
+
+    # See the analogous comment in test_api_explain.py::
+    # test_explain_includes_citation_when_rag_doc_id_is_set - verify_question_and_retry's
+    # consistency check independently confirms a cited rag_doc_id is real via
+    # retrieve_knowledge() before ask.py ever gets a chance to call
+    # get_snippet_by_id, so it must also be made to pass.
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="Два глаза",
+                source="principles/two-eyes.md",
+                text_snippet="Группа с двумя глазами не может быть захвачена.",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    app.state.llm_provider = _CitingAskProvider()
+    try:
+        client = TestClient(app)
+        response = client.post("/api/ask", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload())
+        assert response.status_code == 200
+        assert response.json()["citation"] == {
+            "doc_id": "two-eyes-necessary",
+            "title": "Два глаза",
+            "source": "principles/two-eyes.md",
+            "text_snippet": "Группа с двумя глазами не может быть захвачена.",
+        }
+    finally:
+        del app.state.llm_provider
+
+
+def test_ask_omits_citation_when_rag_doc_id_is_none(ask_client):
+    response = ask_client.post("/api/ask", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload())
+    assert response.status_code == 200
+    assert response.json()["citation"] is None
+
+
+def test_ask_omits_citation_when_snippet_lookup_raises_unexpectedly(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from baduk_backend.main import app
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_get_snippet_by_id(doc_id, **kwargs):
+        raise RuntimeError("unexpected chroma failure")
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.get_snippet_by_id", fake_get_snippet_by_id)
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="...",
+                source="...",
+                text_snippet="...",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    app.state.llm_provider = _CitingAskProvider()
+    try:
+        client = TestClient(app)
+        response = client.post("/api/ask", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload())
+        assert response.status_code == 200
+        assert response.json()["citation"] is None
+    finally:
+        del app.state.llm_provider
+
+
+class _VanishedCitingAskProvider:
+    def answer_question(self, question, analysis, board_size, corrections=None):
+        return QuestionAnswer(
+            answer="Тестовый ответ",
+            claims=[QuestionClaim(cited_field="winrate", cited_number=analysis.rootInfo.winrate)],
+            rag_doc_id="vanished-doc",
+        )
+
+
+def test_ask_omits_citation_when_snippet_lookup_returns_none(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from baduk_backend.main import app
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_get_snippet_by_id(doc_id, **kwargs):
+        return None
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.get_snippet_by_id", fake_get_snippet_by_id)
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="vanished-doc",
+                title="...",
+                source="...",
+                text_snippet="...",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    app.state.llm_provider = _VanishedCitingAskProvider()
+    try:
+        client = TestClient(app)
+        response = client.post("/api/ask", headers={"X-Auth-Token": AUTH_TOKEN}, json=_payload())
+        assert response.status_code == 200
+        assert response.json()["citation"] is None
+    finally:
+        del app.state.llm_provider

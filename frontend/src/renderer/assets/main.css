@@ -421,6 +421,29 @@ code {
   max-height: 40vh;
   overflow-y: auto;
 }
+.llm-explanation-panel__ask {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ev-c-text-2, #888);
+}
+.llm-explanation-panel__ask h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.llm-explanation-panel__ask textarea {
+  width: 100%;
+  min-height: 80px;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--color-surface, #0e1223);
+  color: var(--ev-c-text-1, #fff);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  padding: 6px;
+}
 .llm-explanation-panel__opening {
   margin-top: 16px;
   padding-top: 12px;

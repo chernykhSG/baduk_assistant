@@ -209,3 +209,38 @@ def test_build_ask_user_prompt_lists_move_candidates_with_gtp_coords_not_convert
 def test_build_ask_user_prompt_omits_move_candidates_block_when_there_are_none():
     prompt = build_ask_user_prompt("вопрос", _analysis(), 9)
     assert "Ходы-кандидаты" not in prompt
+
+
+def test_format_snippets_default_target_description_says_nahodku():
+    from baduk_backend.llm.providers.llama import _format_snippets
+    from baduk_backend.rag.schemas import RagSnippet
+
+    snippets = [
+        RagSnippet(
+            doc_id="d1",
+            title="Заголовок",
+            source="principles/d1.md",
+            text_snippet="Текст карточки.",
+            relevance_score=0.8,
+        )
+    ]
+    formatted = _format_snippets(snippets)
+    assert "находку" in formatted
+
+
+def test_format_snippets_custom_target_description_replaces_nahodku():
+    from baduk_backend.llm.providers.llama import _format_snippets
+    from baduk_backend.rag.schemas import RagSnippet
+
+    snippets = [
+        RagSnippet(
+            doc_id="d1",
+            title="Заголовок",
+            source="principles/d1.md",
+            text_snippet="Текст карточки.",
+            relevance_score=0.8,
+        )
+    ]
+    formatted = _format_snippets(snippets, target_description="вопрос игрока")
+    assert "вопрос игрока" in formatted
+    assert "находку" not in formatted

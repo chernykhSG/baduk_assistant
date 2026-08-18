@@ -13,6 +13,7 @@ from baduk_backend.llm.prompts import (
     ANSWER_TOOL_PARAMETERS,
     ANSWER_WITH_RAG_TOOL_PARAMETERS,
     ASK_DECISION_TOOL_PARAMETERS,
+    ASK_RAG_SEARCH_INSTRUCTIONS,
     ASK_SYSTEM_PROMPT,
     EXPLANATION_TOOL_PARAMETERS,
     EXPLANATION_WITH_RAG_TOOL_PARAMETERS,
@@ -42,7 +43,7 @@ def _rag_available() -> bool:
     return DEFAULT_STORE_PATH.exists()
 
 
-def _format_snippets(snippets: list[RagSnippet]) -> str:
+def _format_snippets(snippets: list[RagSnippet], target_description: str = "находку") -> str:
     if not snippets:
         return "Поиск по базе знаний не дал результатов."
     parts = ["Найденные материалы из базы знаний Го:"]
@@ -51,8 +52,8 @@ def _format_snippets(snippets: list[RagSnippet]) -> str:
             f'doc_id="{snippet.doc_id}", "{snippet.title}" ({snippet.source}):\n{snippet.text_snippet}'
         )
     parts.append(
-        "Если один из этих материалов действительно объясняет находку - укажи его doc_id "
-        "в поле rag_doc_id. Если ни один не подходит - оставь rag_doc_id пустым (null)."
+        f"Если один из этих материалов действительно объясняет {target_description} - укажи его "
+        "doc_id в поле rag_doc_id. Если ни один не подходит - оставь rag_doc_id пустым (null)."
     )
     return "\n\n".join(parts)
 
@@ -162,7 +163,7 @@ class LlamaProvider:
             choice = self._call(ASK_SYSTEM_PROMPT, user_content, ANSWER_TOOL_PARAMETERS)
             return _validate_question_answer(_extract_json(choice), choice.get("finish_reason"))
 
-        system_prompt = ASK_SYSTEM_PROMPT + "\n" + RAG_SEARCH_INSTRUCTIONS
+        system_prompt = ASK_SYSTEM_PROMPT + "\n" + ASK_RAG_SEARCH_INSTRUCTIONS
         decision_choice = self._call(system_prompt, user_content, ASK_DECISION_TOOL_PARAMETERS)
         decision = _extract_json(decision_choice)
 
@@ -176,7 +177,9 @@ class LlamaProvider:
         except (RuntimeError, ImportError):
             snippets = []
 
-        final_user_content = user_content + "\n\n" + _format_snippets(snippets)
+        final_user_content = user_content + "\n\n" + _format_snippets(
+            snippets, target_description="вопрос игрока"
+        )
         final_choice = self._call(system_prompt, final_user_content, ANSWER_WITH_RAG_TOOL_PARAMETERS)
         return _validate_question_answer(_extract_json(final_choice), final_choice.get("finish_reason"))
 

@@ -551,3 +551,53 @@ def test_llama_provider_answer_question_degrades_gracefully_when_search_fails_mi
     final_user_content = next(m["content"] for m in llm.calls[1]["messages"] if m["role"] == "user")
     assert "не дал результатов" in final_user_content
     assert answer.rag_doc_id is None
+
+
+def test_llama_provider_answer_question_rag_system_prompt_uses_record_answer_not_record_explanation(
+    monkeypatch,
+):
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+    response = _chat_completion_response(
+        json.dumps({"tool": "record_answer", "answer": "ok", "claims": []})
+    )
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    provider.answer_question("вопрос", _analysis(), board_size=9)
+
+    sent_messages = llm.calls[0]["messages"]
+    system_content = next(m["content"] for m in sent_messages if m["role"] == "system")
+    assert "record_answer" in system_content
+    assert "record_explanation" not in system_content
+
+
+def test_llama_provider_answer_question_rag_results_prompt_does_not_mention_finding(monkeypatch):
+    from baduk_backend.rag.schemas import RagSnippet
+
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="Два глаза",
+                source="principles/two-eyes.md",
+                text_snippet="Группа с двумя глазами не может быть захвачена.",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    decision_response = _chat_completion_response(json.dumps({"tool": "retrieve_knowledge"}))
+    final_response = _chat_completion_response(
+        json.dumps({"answer": "ok", "claims": [], "rag_doc_id": None})
+    )
+    llm = _FakeLlama([decision_response, final_response])
+    provider = LlamaProvider(llm=llm)
+
+    provider.answer_question("вопрос", _analysis(), board_size=9)
+
+    final_user_content = next(m["content"] for m in llm.calls[1]["messages"] if m["role"] == "user")
+    assert "находку" not in final_user_content
+    assert "вопрос игрока" in final_user_content

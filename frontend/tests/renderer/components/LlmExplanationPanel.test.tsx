@@ -641,4 +641,13 @@ describe('LlmExplanationPanel', () => {
       expect(queryByText('Ответ про первую позицию')).toBeNull()
     })
   })
+
+  it('limits the question textarea to 500 characters', () => {
+    loadPosition()
+    const { getByPlaceholderText } = render(<LlmExplanationPanel />)
+    expect(
+      (getByPlaceholderText('Задайте вопрос про текущую позицию...') as HTMLTextAreaElement)
+        .maxLength
+    ).toBe(500)
+  })
 })

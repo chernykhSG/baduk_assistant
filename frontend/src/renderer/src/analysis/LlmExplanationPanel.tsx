@@ -219,6 +219,7 @@ export function LlmExplanationPanel(): JSX.Element {
         <textarea
           placeholder="Задайте вопрос про текущую позицию..."
           value={question}
+          maxLength={500}
           onInput={(e) => setQuestion((e.target as HTMLTextAreaElement).value)}
         />
         <button
