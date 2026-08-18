@@ -1,7 +1,9 @@
+from typing import Protocol
+
 from baduk_backend.api.schemas import AnalyzeResponse
 from baduk_backend.feature_extraction.schemas import Finding
 from baduk_backend.llm.orchestrator import LLMProvider
-from baduk_backend.llm.schemas import Claim, Explanation
+from baduk_backend.llm.schemas import Claim, Explanation, QuestionAnswer, QuestionClaim
 
 MAX_CONSISTENCY_RETRIES = 2
 FLOAT_TOLERANCE = 0.01
@@ -148,3 +150,114 @@ def verify_and_retry(
     if _is_verified(explanation, finding, analysis, rag_doc_id_ok):
         return explanation, True
     return _fallback_explanation(finding), False
+
+
+class _AskProvider(Protocol):
+    def answer_question(
+        self,
+        question: str,
+        analysis: AnalyzeResponse,
+        board_size: int,
+        corrections: list[str] | None = None,
+    ) -> QuestionAnswer: ...
+
+
+def _question_true_value(claim: QuestionClaim, analysis: AnalyzeResponse) -> float | None:
+    if claim.cited_move is None:
+        return getattr(analysis.rootInfo, claim.cited_field, None)
+    for move_info in analysis.moveInfos:
+        if move_info.move == claim.cited_move:
+            return getattr(move_info, claim.cited_field, None)
+    return None
+
+
+def _question_claim_matches(claim: QuestionClaim, analysis: AnalyzeResponse) -> bool:
+    true_value = _question_true_value(claim, analysis)
+    if true_value is None:
+        return False
+    if claim.cited_field == "visits":
+        return int(claim.cited_number) == int(true_value)
+    return abs(claim.cited_number - true_value) <= FLOAT_TOLERANCE
+
+
+def _question_mismatches(answer: QuestionAnswer, analysis: AnalyzeResponse) -> list[QuestionClaim]:
+    return [c for c in answer.claims if not _question_claim_matches(c, analysis)]
+
+
+def _question_correction_message(claim: QuestionClaim, analysis: AnalyzeResponse) -> str:
+    true_value = _question_true_value(claim, analysis)
+    if true_value is None:
+        move_part = f' хода "{claim.cited_move}"' if claim.cited_move else " текущей позиции"
+        return (
+            f'Поле "{claim.cited_field}" не найдено для{move_part} - '
+            "убери это утверждение или сошлись на подходящем поле из переданных данных."
+        )
+    return (
+        f'Ты сослался на число {claim.cited_number} для поля "{claim.cited_field}", '
+        f"но настоящее значение - {true_value}. Используй точное число или убери это утверждение."
+    )
+
+
+def _fallback_answer(analysis: AnalyzeResponse) -> QuestionAnswer:
+    answer = (
+        "Не удалось получить проверенный ответ на этот вопрос. "
+        f"Точные данные текущей позиции: winrate={analysis.rootInfo.winrate:.2f}, "
+        f"scoreLead={analysis.rootInfo.scoreLead:.2f}, visits={analysis.rootInfo.visits}. "
+        "Эти числа - напрямую из анализа KataGo; содержательный текстовый ответ "
+        "на ваш вопрос проверить не удалось."
+    )
+    return QuestionAnswer(answer=answer, claims=[])
+
+
+def _question_rag_doc_id_valid(rag_doc_id: str | None, question: str) -> bool:
+    if rag_doc_id is None:
+        return True
+    from baduk_backend.llm.prompts import RAG_TOP_K
+    from baduk_backend.rag.retrieval import retrieve_knowledge
+
+    try:
+        snippets = retrieve_knowledge(question, top_k=RAG_TOP_K)
+    except (RuntimeError, ImportError):
+        return False
+    return rag_doc_id in {s.doc_id for s in snippets}
+
+
+def _question_rag_doc_id_correction_message(rag_doc_id: str | None) -> str:
+    return (
+        f'Ты сослался на doc_id="{rag_doc_id}", которого не было среди найденных материалов - '
+        "убери цитату или используй настоящий doc_id."
+    )
+
+
+def _is_question_verified(answer: QuestionAnswer, analysis: AnalyzeResponse, rag_doc_id_ok: bool) -> bool:
+    return bool(answer.claims) and not _question_mismatches(answer, analysis) and rag_doc_id_ok
+
+
+def _build_question_corrections(
+    answer: QuestionAnswer, analysis: AnalyzeResponse, rag_doc_id_ok: bool
+) -> list[str]:
+    if not answer.claims:
+        corrections = [_EMPTY_CLAIMS_CORRECTION]
+    else:
+        corrections = [
+            _question_correction_message(c, analysis) for c in _question_mismatches(answer, analysis)
+        ]
+    if not rag_doc_id_ok:
+        corrections.append(_question_rag_doc_id_correction_message(answer.rag_doc_id))
+    return corrections
+
+
+def verify_question_and_retry(
+    provider: _AskProvider, question: str, analysis: AnalyzeResponse, board_size: int
+) -> tuple[QuestionAnswer, bool]:
+    answer = provider.answer_question(question, analysis, board_size)
+    for _ in range(MAX_CONSISTENCY_RETRIES):
+        rag_doc_id_ok = _question_rag_doc_id_valid(answer.rag_doc_id, question)
+        if _is_question_verified(answer, analysis, rag_doc_id_ok):
+            return answer, True
+        corrections = _build_question_corrections(answer, analysis, rag_doc_id_ok)
+        answer = provider.answer_question(question, analysis, board_size, corrections=corrections)
+    rag_doc_id_ok = _question_rag_doc_id_valid(answer.rag_doc_id, question)
+    if _is_question_verified(answer, analysis, rag_doc_id_ok):
+        return answer, True
+    return _fallback_answer(analysis), False

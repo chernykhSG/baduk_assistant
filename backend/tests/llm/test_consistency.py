@@ -433,3 +433,180 @@ def test_verify_and_retry_does_not_crash_on_cross_type_field_opening_loss_findin
     assert verified is True
     assert result == good
     assert "не относится" in provider.calls[1][0]
+
+
+from baduk_backend.llm.consistency import verify_question_and_retry
+from baduk_backend.llm.schemas import QuestionAnswer, QuestionClaim
+from baduk_backend.api.schemas import MoveInfo
+
+
+class _RecordingFakeAskProvider:
+    def __init__(self, responses: list[QuestionAnswer]):
+        self._responses = list(responses)
+        self.calls: list[list[str] | None] = []
+
+    def answer_question(self, question, analysis, board_size, corrections=None):
+        self.calls.append(corrections)
+        return self._responses.pop(0)
+
+
+def _analysis_with_move() -> AnalyzeResponse:
+    return AnalyzeResponse(
+        id="x",
+        moveInfos=[MoveInfo(move="Q4", winrate=0.55, scoreLead=1.5, visits=300, prior=0.2, pv=["Q4"])],
+        rootInfo=RootInfo(winrate=0.5, scoreLead=0.0, visits=250),
+        ownership=[0.0] * 81,
+    )
+
+
+def test_verify_question_and_retry_accepts_correct_rootinfo_claim_on_first_try():
+    answer = QuestionAnswer(
+        answer="...", claims=[QuestionClaim(cited_field="winrate", cited_number=0.5)]
+    )
+    provider = _RecordingFakeAskProvider([answer])
+
+    result, verified = verify_question_and_retry(provider, "какой сейчас winrate?", _analysis(), 9)
+
+    assert verified is True
+    assert result == answer
+    assert provider.calls == [None]
+
+
+def test_verify_question_and_retry_accepts_correct_move_specific_claim():
+    answer = QuestionAnswer(
+        answer="...",
+        claims=[QuestionClaim(cited_field="prior", cited_number=0.2, cited_move="Q4")],
+    )
+    provider = _RecordingFakeAskProvider([answer])
+
+    result, verified = verify_question_and_retry(
+        provider, "насколько силён ход Q4?", _analysis_with_move(), 9
+    )
+
+    assert verified is True
+    assert result == answer
+
+
+def test_verify_question_and_retry_rejects_claim_citing_a_move_not_in_moveinfos_then_retries():
+    bad = QuestionAnswer(
+        answer="...",
+        claims=[QuestionClaim(cited_field="prior", cited_number=0.2, cited_move="C3")],
+    )
+    good = QuestionAnswer(
+        answer="...", claims=[QuestionClaim(cited_field="winrate", cited_number=0.5)]
+    )
+    provider = _RecordingFakeAskProvider([bad, good])
+
+    result, verified = verify_question_and_retry(provider, "вопрос", _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert provider.calls[0] is None
+    assert provider.calls[1] is not None
+    assert "prior" in provider.calls[1][0]
+
+
+def test_verify_question_and_retry_retries_on_wrong_number_then_succeeds():
+    bad = QuestionAnswer(
+        answer="...", claims=[QuestionClaim(cited_field="winrate", cited_number=0.1)]
+    )
+    good = QuestionAnswer(
+        answer="...", claims=[QuestionClaim(cited_field="winrate", cited_number=0.5)]
+    )
+    provider = _RecordingFakeAskProvider([bad, good])
+
+    result, verified = verify_question_and_retry(provider, "вопрос", _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+    assert "winrate" in provider.calls[1][0]
+
+
+def test_verify_question_and_retry_rejects_empty_claims_list():
+    empty = QuestionAnswer(answer="...", claims=[])
+    good = QuestionAnswer(
+        answer="...", claims=[QuestionClaim(cited_field="winrate", cited_number=0.5)]
+    )
+    provider = _RecordingFakeAskProvider([empty, good])
+
+    result, verified = verify_question_and_retry(provider, "вопрос", _analysis(), 9)
+
+    assert verified is True
+    assert result == good
+
+
+def test_verify_question_and_retry_falls_back_after_exhausting_retries():
+    bad = QuestionAnswer(
+        answer="...", claims=[QuestionClaim(cited_field="winrate", cited_number=0.1)]
+    )
+    provider = _RecordingFakeAskProvider([bad, bad, bad])
+
+    result, verified = verify_question_and_retry(provider, "вопрос", _analysis(), 9)
+
+    assert verified is False
+    assert result.claims == []
+    # The fallback is a verbatim dump of rootInfo, not a hallucinated template
+    # referencing a Finding (there is no Finding here).
+    assert "0.5" in result.answer
+    assert "не удалось" in result.answer.lower()
+
+
+def test_verify_question_and_retry_accepts_valid_rag_doc_id(monkeypatch):
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        assert query == "какой сейчас winrate?"
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="...",
+                source="...",
+                text_snippet="...",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    answer = QuestionAnswer(
+        answer="...",
+        claims=[QuestionClaim(cited_field="winrate", cited_number=0.5)],
+        rag_doc_id="two-eyes-necessary",
+    )
+    provider = _RecordingFakeAskProvider([answer])
+
+    result, verified = verify_question_and_retry(provider, "какой сейчас winrate?", _analysis(), 9)
+
+    assert verified is True
+    assert result.rag_doc_id == "two-eyes-necessary"
+
+
+def test_verify_question_and_retry_rejects_hallucinated_rag_doc_id_then_retries(monkeypatch):
+    from baduk_backend.rag.schemas import RagSnippet
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        return [
+            RagSnippet(
+                doc_id="real-doc", title="...", source="...", text_snippet="...", relevance_score=0.9
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    bad = QuestionAnswer(
+        answer="...",
+        claims=[QuestionClaim(cited_field="winrate", cited_number=0.5)],
+        rag_doc_id="made-up-doc",
+    )
+    good = QuestionAnswer(
+        answer="...",
+        claims=[QuestionClaim(cited_field="winrate", cited_number=0.5)],
+        rag_doc_id="real-doc",
+    )
+    provider = _RecordingFakeAskProvider([bad, good])
+
+    result, verified = verify_question_and_retry(provider, "вопрос", _analysis(), 9)
+
+    assert verified is True
+    assert result.rag_doc_id == "real-doc"
+    assert "made-up-doc" in provider.calls[1][0]
