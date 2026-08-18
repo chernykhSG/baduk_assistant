@@ -10,16 +10,21 @@ from pydantic import ValidationError
 from baduk_backend.api.schemas import AnalyzeResponse
 from baduk_backend.feature_extraction.schemas import Finding
 from baduk_backend.llm.prompts import (
+    ANSWER_TOOL_PARAMETERS,
+    ANSWER_WITH_RAG_TOOL_PARAMETERS,
+    ASK_DECISION_TOOL_PARAMETERS,
+    ASK_SYSTEM_PROMPT,
     EXPLANATION_TOOL_PARAMETERS,
     EXPLANATION_WITH_RAG_TOOL_PARAMETERS,
     RAG_DECISION_TOOL_PARAMETERS,
     RAG_SEARCH_INSTRUCTIONS,
     RAG_TOP_K,
     SYSTEM_PROMPT,
+    build_ask_user_prompt,
     build_rag_query,
     build_user_prompt,
 )
-from baduk_backend.llm.schemas import Explanation
+from baduk_backend.llm.schemas import Explanation, QuestionAnswer
 from baduk_backend.rag.schemas import RagSnippet
 
 DEFAULT_N_GPU_LAYERS = -1
@@ -71,6 +76,16 @@ def _extract_json(choice: dict) -> dict:
 def _validate_explanation(data: dict, finish_reason: str | None = None) -> Explanation:
     try:
         return Explanation.model_validate(data)
+    except ValidationError as exc:
+        raise RuntimeError(
+            f"Llama did not produce valid structured output "
+            f"(finish_reason={finish_reason!r}, content={data!r})"
+        ) from exc
+
+
+def _validate_question_answer(data: dict, finish_reason: str | None = None) -> QuestionAnswer:
+    try:
+        return QuestionAnswer.model_validate(data)
     except ValidationError as exc:
         raise RuntimeError(
             f"Llama did not produce valid structured output "
@@ -131,6 +146,39 @@ class LlamaProvider:
         final_user_content = user_content + "\n\n" + _format_snippets(snippets)
         final_choice = self._call(system_prompt, final_user_content, EXPLANATION_WITH_RAG_TOOL_PARAMETERS)
         return _validate_explanation(_extract_json(final_choice), final_choice.get("finish_reason"))
+
+    def answer_question(
+        self,
+        question: str,
+        analysis: AnalyzeResponse,
+        board_size: int,
+        corrections: list[str] | None = None,
+    ) -> QuestionAnswer:
+        user_content = build_ask_user_prompt(question, analysis, board_size)
+        if corrections:
+            user_content += "\n\nИсправь предыдущий ответ:\n" + "\n".join(corrections)
+
+        if not _rag_available():
+            choice = self._call(ASK_SYSTEM_PROMPT, user_content, ANSWER_TOOL_PARAMETERS)
+            return _validate_question_answer(_extract_json(choice), choice.get("finish_reason"))
+
+        system_prompt = ASK_SYSTEM_PROMPT + "\n" + RAG_SEARCH_INSTRUCTIONS
+        decision_choice = self._call(system_prompt, user_content, ASK_DECISION_TOOL_PARAMETERS)
+        decision = _extract_json(decision_choice)
+
+        if decision.get("tool") != "retrieve_knowledge":
+            return _validate_question_answer(decision, decision_choice.get("finish_reason"))
+
+        from baduk_backend.rag.retrieval import retrieve_knowledge
+
+        try:
+            snippets = retrieve_knowledge(question, top_k=RAG_TOP_K)
+        except (RuntimeError, ImportError):
+            snippets = []
+
+        final_user_content = user_content + "\n\n" + _format_snippets(snippets)
+        final_choice = self._call(system_prompt, final_user_content, ANSWER_WITH_RAG_TOOL_PARAMETERS)
+        return _validate_question_answer(_extract_json(final_choice), final_choice.get("finish_reason"))
 
     def _call(self, system_prompt: str, user_content: str, schema: dict) -> dict:
         with self._lock:

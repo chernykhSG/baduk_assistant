@@ -376,3 +376,178 @@ def test_rag_available_returns_true_when_installed_and_store_exists(tmp_path, mo
     monkeypatch.setattr("baduk_backend.rag.store.DEFAULT_STORE_PATH", store_path)
 
     assert _rag_available() is True
+
+
+def _question_json_response(answer: str, claims: list[dict]):
+    return _chat_completion_response(json.dumps({"answer": answer, "claims": claims}))
+
+
+def test_llama_provider_answer_question_parses_json_response():
+    response = _question_json_response(
+        "Winrate сейчас 50%.", [{"cited_field": "winrate", "cited_number": 0.5}]
+    )
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    answer = provider.answer_question("какой winrate?", _analysis(), board_size=9)
+
+    assert answer.answer == "Winrate сейчас 50%."
+    assert answer.claims[0].cited_field == "winrate"
+
+
+def test_llama_provider_answer_question_uses_answer_tool_schema_without_rag():
+    from baduk_backend.llm.prompts import ANSWER_TOOL_PARAMETERS
+
+    response = _question_json_response("ok", [])
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    provider.answer_question("вопрос", _analysis(), board_size=9)
+
+    assert llm.calls[0]["response_format"] == {"type": "json_object", "schema": ANSWER_TOOL_PARAMETERS}
+
+
+def test_llama_provider_answer_question_prompt_includes_the_question_text():
+    response = _question_json_response("ok", [])
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    provider.answer_question("почему белые слабы?", _analysis(), board_size=9)
+
+    sent_messages = llm.calls[0]["messages"]
+    user_content = next(m["content"] for m in sent_messages if m["role"] == "user")
+    assert "почему белые слабы?" in user_content
+
+
+def test_llama_provider_answer_question_appends_corrections_to_prompt():
+    response = _question_json_response("ok", [])
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    provider.answer_question("вопрос", _analysis(), board_size=9, corrections=["ты ошибся про X"])
+
+    sent_messages = llm.calls[0]["messages"]
+    user_content = next(m["content"] for m in sent_messages if m["role"] == "user")
+    assert "ты ошибся про X" in user_content
+
+
+def test_llama_provider_answer_question_raises_if_content_is_none():
+    response = _chat_completion_response(None)
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    with pytest.raises(RuntimeError, match="did not produce"):
+        provider.answer_question("вопрос", _analysis(), board_size=9)
+
+
+def test_llama_provider_answer_question_raises_on_schema_validation_failure():
+    response = {
+        "choices": [
+            {"finish_reason": "length", "message": {"content": json.dumps({"answer": "ok"})}}
+        ]
+    }
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    with pytest.raises(RuntimeError, match="finish_reason='length'"):
+        provider.answer_question("вопрос", _analysis(), board_size=9)
+
+
+def test_llama_provider_answer_question_without_rag_available_uses_single_call_schema():
+    from baduk_backend.llm.prompts import ANSWER_TOOL_PARAMETERS
+
+    response = _question_json_response("ok", [])
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    answer = provider.answer_question("вопрос", _analysis(), board_size=9)
+
+    assert len(llm.calls) == 1
+    assert llm.calls[0]["response_format"] == {"type": "json_object", "schema": ANSWER_TOOL_PARAMETERS}
+    assert answer.rag_doc_id is None
+
+
+def test_llama_provider_answer_question_with_rag_available_can_decide_not_to_search(monkeypatch):
+    from baduk_backend.llm.prompts import ASK_DECISION_TOOL_PARAMETERS
+
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+    response = _chat_completion_response(
+        json.dumps({"tool": "record_answer", "answer": "ok", "claims": []})
+    )
+    llm = _FakeLlama(response)
+    provider = LlamaProvider(llm=llm)
+
+    answer = provider.answer_question("вопрос", _analysis(), board_size=9)
+
+    assert len(llm.calls) == 1
+    assert llm.calls[0]["response_format"] == {
+        "type": "json_object",
+        "schema": ASK_DECISION_TOOL_PARAMETERS,
+    }
+    assert answer.answer == "ok"
+    assert answer.rag_doc_id is None
+
+
+def test_llama_provider_answer_question_with_rag_available_searches_with_the_question_text(monkeypatch):
+    from baduk_backend.llm.prompts import ANSWER_WITH_RAG_TOOL_PARAMETERS
+    from baduk_backend.rag.schemas import RagSnippet
+
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+
+    captured_queries = []
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        captured_queries.append(query)
+        assert top_k == 3
+        return [
+            RagSnippet(
+                doc_id="two-eyes-necessary",
+                title="Два глаза",
+                source="principles/two-eyes.md",
+                text_snippet="Группа с двумя глазами не может быть захвачена.",
+                relevance_score=0.9,
+            )
+        ]
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    decision_response = _chat_completion_response(json.dumps({"tool": "retrieve_knowledge"}))
+    final_response = _chat_completion_response(
+        json.dumps({"answer": "У группы нет двух глаз.", "claims": [], "rag_doc_id": "two-eyes-necessary"})
+    )
+    llm = _FakeLlama([decision_response, final_response])
+    provider = LlamaProvider(llm=llm)
+
+    answer = provider.answer_question("почему группа слаба?", _analysis(), board_size=9)
+
+    assert len(llm.calls) == 2
+    assert captured_queries == ["почему группа слаба?"]
+    assert llm.calls[1]["response_format"] == {
+        "type": "json_object",
+        "schema": ANSWER_WITH_RAG_TOOL_PARAMETERS,
+    }
+    final_user_content = next(m["content"] for m in llm.calls[1]["messages"] if m["role"] == "user")
+    assert "two-eyes-necessary" in final_user_content
+    assert answer.rag_doc_id == "two-eyes-necessary"
+    assert answer.answer == "У группы нет двух глаз."
+
+
+def test_llama_provider_answer_question_degrades_gracefully_when_search_fails_mid_flow(monkeypatch):
+    monkeypatch.setattr("baduk_backend.llm.providers.llama._rag_available", lambda: True)
+
+    def fake_retrieve_knowledge(query, top_k=3, **kwargs):
+        raise RuntimeError("RAG store not found")
+
+    monkeypatch.setattr("baduk_backend.rag.retrieval.retrieve_knowledge", fake_retrieve_knowledge)
+
+    decision_response = _chat_completion_response(json.dumps({"tool": "retrieve_knowledge"}))
+    final_response = _chat_completion_response(json.dumps({"answer": "ok", "claims": [], "rag_doc_id": None}))
+    llm = _FakeLlama([decision_response, final_response])
+    provider = LlamaProvider(llm=llm)
+
+    answer = provider.answer_question("вопрос", _analysis(), board_size=9)
+
+    assert len(llm.calls) == 2
+    final_user_content = next(m["content"] for m in llm.calls[1]["messages"] if m["role"] == "user")
+    assert "не дал результатов" in final_user_content
+    assert answer.rag_doc_id is None
